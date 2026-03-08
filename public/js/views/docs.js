@@ -21,6 +21,7 @@ Views.docs = {
           '<div class="nav-item doc-nav-item" data-doc="compliance"><span class="nav-item-icon">&#9989;</span><span class="nav-item-label">Compliance &amp; Reports</span></div>' +
           '<div class="nav-item doc-nav-item" data-doc="tools"><span class="nav-item-icon">&#128295;</span><span class="nav-item-label">Terminal, OSINT &amp; MCP</span></div>' +
           '<div class="nav-item doc-nav-item" data-doc="system"><span class="nav-item-icon">&#9881;</span><span class="nav-item-label">Settings &amp; System</span></div>' +
+          '<div class="nav-item doc-nav-item" data-doc="workspace"><span class="nav-item-icon">&#128736;</span><span class="nav-item-label">Workspace &amp; Git</span></div>' +
           '<div class="nav-item doc-nav-item" data-doc="api"><span class="nav-item-icon">&#128268;</span><span class="nav-item-label">API Reference</span></div>' +
           '<div class="nav-item doc-nav-item" data-doc="scanners"><span class="nav-item-icon">&#128187;</span><span class="nav-item-label">Scanner Setup</span></div>' +
         '</div>' +
@@ -607,6 +608,85 @@ Views.docs = {
         '<li><strong>Add Note</strong> &mdash; Create custom notes with markdown support. Saved to data/ store.</li>' +
       '</ul>' +
       '<p>Built-in articles include: Getting Started with Vigil, Understanding Security Scores, Scanner Installation, RBAC Roles, and more. Add your own SOPs, runbooks, and investigation notes.</p>',
+
+
+    /* ===== WORKSPACE & GIT ===== */
+    'workspace':
+      '<h2 style="color:var(--text-primary);font-size:var(--font-size-xl);margin-bottom:16px;">Workspace &amp; Git</h2>' +
+      '<p style="margin-bottom:16px;">The Workspace section includes Git Intelligence Center, GitHub Hub, Calendar, and Notes. The Git view provides commit timeline, branch management, stash operations, AI-assisted commit messages, and multi-repo project management with encrypted credential support for private repositories.</p>' +
+
+      '<h3 style="color:var(--cyan);margin:16px 0 8px;">Connecting a GitHub Repository with a Personal Access Token</h3>' +
+      '<p style="margin-bottom:8px;">To work with private repositories (push, pull, clone), you need a GitHub Personal Access Token (PAT) stored in the encrypted credential vault.</p>' +
+
+      '<p style="color:var(--text-primary);font-weight:600;margin:16px 0 4px;">Step 1: Create a GitHub Personal Access Token</p>' +
+      '<ol style="padding-left:20px;list-style:decimal;">' +
+        '<li>Go to <strong>github.com</strong> and sign in to your account.</li>' +
+        '<li>Click your profile picture (top-right) &rarr; <strong>Settings</strong>.</li>' +
+        '<li>Scroll down the left sidebar &rarr; <strong>Developer settings</strong> (at the very bottom).</li>' +
+        '<li>Click <strong>Personal access tokens</strong> &rarr; <strong>Tokens (classic)</strong>.</li>' +
+        '<li>Click <strong>Generate new token</strong> &rarr; <strong>Generate new token (classic)</strong>.</li>' +
+        '<li>Give it a descriptive <strong>Note</strong> (e.g. "Vigil SOC").</li>' +
+        '<li>Set an <strong>Expiration</strong> (90 days recommended, or custom).</li>' +
+        '<li>Under <strong>Select scopes</strong>, check <code style="background:var(--well);padding:1px 4px;border-radius:3px;">repo</code> (Full control of private repositories). This grants read/write access to your repos.</li>' +
+        '<li>Click <strong>Generate token</strong> at the bottom.</li>' +
+        '<li><strong>Copy the token immediately</strong> &mdash; it starts with <code style="background:var(--well);padding:1px 4px;border-radius:3px;">ghp_</code> and is only shown once. If you lose it, you must generate a new one.</li>' +
+      '</ol>' +
+
+      '<p style="color:var(--text-primary);font-weight:600;margin:16px 0 4px;">Step 2: Store the Token in the Credential Vault</p>' +
+      '<ol style="padding-left:20px;list-style:decimal;">' +
+        '<li>In Vigil, navigate to <strong>Credentials</strong> in the sidebar (under System).</li>' +
+        '<li>Click <strong>Add Credential</strong>.</li>' +
+        '<li>Fill in the fields:' +
+          '<ul style="padding-left:20px;list-style:disc;margin:4px 0;">' +
+            '<li><strong>Name:</strong> a descriptive name (e.g. <code style="background:var(--well);padding:1px 4px;border-radius:3px;">github-pat</code>)</li>' +
+            '<li><strong>Type:</strong> select <code style="background:var(--well);padding:1px 4px;border-radius:3px;">api_token</code></li>' +
+            '<li><strong>Value:</strong> paste your <code style="background:var(--well);padding:1px 4px;border-radius:3px;">ghp_...</code> token</li>' +
+          '</ul>' +
+        '</li>' +
+        '<li>Click <strong>Save</strong>. The token is encrypted with AES-256-GCM and stored in the vault. It is never visible in plaintext again (you can reveal it from the Credentials view when needed).</li>' +
+      '</ol>' +
+
+      '<p style="color:var(--text-primary);font-weight:600;margin:16px 0 4px;">Step 3: Add a Git Project and Link the Token</p>' +
+      '<ol style="padding-left:20px;list-style:decimal;">' +
+        '<li>Navigate to <strong>Git</strong> in the sidebar (under Workspace).</li>' +
+        '<li>Click the <strong>gear icon</strong> next to the project selector to open project management.</li>' +
+        '<li>Click <strong>Add Project</strong>.</li>' +
+        '<li>Fill in the fields:' +
+          '<ul style="padding-left:20px;list-style:disc;margin:4px 0;">' +
+            '<li><strong>Name:</strong> a display name for the repo</li>' +
+            '<li><strong>Remote URL:</strong> the HTTPS clone URL (e.g. <code style="background:var(--well);padding:1px 4px;border-radius:3px;">https://github.com/your-org/your-repo.git</code>)</li>' +
+            '<li><strong>Local Path:</strong> leave empty to auto-clone into the container, or enter an existing path</li>' +
+            '<li><strong>Credential:</strong> select the credential you created (e.g. <code style="background:var(--well);padding:1px 4px;border-radius:3px;">github-pat</code>)</li>' +
+          '</ul>' +
+        '</li>' +
+        '<li>Click <strong>Save</strong>. If no local path was provided, Vigil clones the repo automatically using the encrypted token.</li>' +
+        '<li>The project appears in the project selector dropdown. Click it to activate &mdash; all Git view panels (commits, branches, diff, stash) now operate on this repo.</li>' +
+      '</ol>' +
+
+      '<p style="color:var(--text-primary);font-weight:600;margin:16px 0 4px;">How Authentication Works</p>' +
+      '<p>When you push, pull, or clone, Vigil retrieves the token from the encrypted vault at runtime and injects it into the HTTPS URL: <code style="background:var(--well);padding:1px 4px;border-radius:3px;">https://TOKEN@github.com/...</code>. The token is never written to disk in plaintext or stored in git config. SSH keys are also supported &mdash; store as type <code style="background:var(--well);padding:1px 4px;border-radius:3px;">ssh_key</code> and Vigil writes a temporary key file with 0600 permissions for the git operation.</p>' +
+
+      '<h3 style="color:var(--cyan);margin:16px 0 8px;">Git Intelligence Center Features</h3>' +
+      '<ul style="padding-left:20px;list-style:disc;">' +
+        '<li><strong>Commit Timeline</strong> &mdash; Rich commit log with author, date, files changed, insertions/deletions.</li>' +
+        '<li><strong>Branch Manager</strong> &mdash; View local and remote branches with last commit info. AI branch cleanup analysis.</li>' +
+        '<li><strong>Diff Viewer</strong> &mdash; Staged and unstaged diffs with stat summary.</li>' +
+        '<li><strong>Stash Manager</strong> &mdash; List, push, and pop stashes.</li>' +
+        '<li><strong>AI Commit Assistant</strong> &mdash; Generate conventional commit messages from staged changes. AI code review before committing.</li>' +
+        '<li><strong>AI PR Description</strong> &mdash; Generate pull request title, summary, and test plan from branch diff.</li>' +
+        '<li><strong>AI Conflict Help</strong> &mdash; Analyze merge conflicts with resolution suggestions.</li>' +
+        '<li><strong>Heatmap</strong> &mdash; GitHub-style contribution calendar (last 12 months).</li>' +
+        '<li><strong>Contributors</strong> &mdash; Commit count by author.</li>' +
+        '<li><strong>Repo Stats</strong> &mdash; Total commits, file count, repo size, first commit date.</li>' +
+      '</ul>' +
+
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">FAQ:</p>' +
+      '<p><strong>Q: Do I need a PAT for public repos?</strong><br>A: No. Public repos can be cloned and read without a token. You only need a PAT for pushing to any repo or cloning/pulling private repos.</p>' +
+      '<p><strong>Q: My token expired, what happens?</strong><br>A: Git operations will fail with a 401 error. Generate a new token on GitHub, then update the credential in Vigil\'s Credentials view (delete the old one, add a new one with the same name).</p>' +
+      '<p><strong>Q: Can I use fine-grained tokens instead of classic?</strong><br>A: Yes. Fine-grained tokens work the same way &mdash; they also start with <code style="background:var(--well);padding:1px 4px;border-radius:3px;">github_pat_</code>. Select the specific repositories and permissions you need (Contents: read/write is the minimum for push/pull).</p>' +
+      '<p><strong>Q: Is my token safe?</strong><br>A: Tokens are encrypted with AES-256-GCM in the credential vault. They are only decrypted in memory during git operations. Set <code style="background:var(--well);padding:1px 4px;border-radius:3px;">ENCRYPTION_KEY</code> in your .env file for persistent encryption across container restarts.</p>' +
+      '<p><strong>Q: Can I manage multiple repos?</strong><br>A: Yes. Add multiple projects in the Git view, each with its own credential. Switch between them using the project selector dropdown.</p>' +
+      '<p><strong>Q: The Git view shows empty data?</strong><br>A: The container needs a git repository to read from. Add a project with a remote URL to auto-clone, or specify a local path to an existing repo mount.</p>',
 
 
     /* ===== API REFERENCE ===== */
