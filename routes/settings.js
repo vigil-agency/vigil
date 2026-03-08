@@ -67,16 +67,16 @@ module.exports = function (app, ctx) {
   app.get('/api/settings/ai', requireAdmin, (req, res) => {
     const settings = readJSON(SETTINGS_PATH, {});
     res.json({
-      provider: settings.aiProvider || 'claude-cli',
-      available: ['claude-cli', 'codex', 'none'],
+      provider: settings.aiProvider || 'none',
+      available: ['claude-api', 'claude-cli', 'codex', 'none'],
     });
   });
 
   // POST /api/settings/ai — update AI provider
   app.post('/api/settings/ai', requireAdmin, (req, res) => {
     const { provider } = req.body;
-    if (!provider || !['claude-cli', 'codex', 'none'].includes(provider)) {
-      return res.status(400).json({ error: 'Invalid provider. Use: claude-cli, codex, none' });
+    if (!provider || !['claude-api', 'claude-cli', 'codex', 'none'].includes(provider)) {
+      return res.status(400).json({ error: 'Invalid provider. Use: claude-api, claude-cli, codex, none' });
     }
 
     const settings = readJSON(SETTINGS_PATH, {});

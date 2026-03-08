@@ -35,7 +35,7 @@ Views.settings = {
       '<div class="tab-content" id="settings-ai">' +
         '<div class="glass-card" style="max-width:500px;">' +
           '<div class="glass-card-title" style="margin-bottom:16px;">AI Provider</div>' +
-          '<div class="form-group"><label class="form-label">Provider</label><select class="form-select" id="settings-ai-provider"><option value="claude">Claude CLI</option><option value="codex">Codex CLI</option><option value="none">None (AI features disabled)</option></select></div>' +
+          '<div class="form-group"><label class="form-label">Provider</label><select class="form-select" id="settings-ai-provider"><option value="claude-api">Claude API (recommended)</option><option value="claude-cli">Claude CLI</option><option value="codex">Codex CLI</option><option value="none">None (AI features disabled)</option></select></div>' +
           '<div id="settings-ai-status" style="margin-top:12px;"></div>' +
           '<div style="display:flex;gap:8px;margin-top:12px;">' +
             '<button class="btn btn-primary" id="settings-save-ai">Save</button>' +
