@@ -192,9 +192,19 @@ module.exports = function (app, ctx) {
 
   // GET /api/code-audit/:id — get code audit scan details (MUST be after specific routes)
   app.get('/api/code-audit/:id', requireAuth, (req, res) => {
+    // Cache completed scans (immutable once complete — 10 min TTL)
+    const neuralCache = require('../lib/neural-cache');
+    const cacheKey = 'code-audit:' + req.params.id;
+    const cached = neuralCache.get(cacheKey);
+    if (cached) return res.json(cached);
+
     const scans = readJSON(SCANS_PATH, []);
     const scan = scans.find(s => s.id === req.params.id && s.type === 'code-audit');
     if (!scan) return res.status(404).json({ error: 'Code audit scan not found' });
+
+    if (scan.status === 'completed') {
+      neuralCache.set(cacheKey, scan, 600000); // 10 min
+    }
     res.json(scan);
   });
 };

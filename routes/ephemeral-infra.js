@@ -78,7 +78,14 @@ Respond with valid JSON only:
 
   // GET /api/proxy-nodes — list all nodes + tunnel status
   app.get('/api/proxy-nodes', requireRole('analyst'), (req, res) => {
-    res.json(proxy.getStatus());
+    // Short cache — state changes frequently (2 min TTL)
+    const neuralCache = require('../lib/neural-cache');
+    const cached = neuralCache.get('proxy:nodes');
+    if (cached) return res.json(cached);
+
+    const status = proxy.getStatus();
+    neuralCache.set('proxy:nodes', status, 120000);
+    res.json(status);
   });
 
   // POST /api/proxy-nodes — create new proxy node
@@ -86,6 +93,7 @@ Respond with valid JSON only:
     const { repo, machineType } = req.body;
     try {
       const node = await proxy.createCodespace(repo, machineType);
+      require('../lib/neural-cache').invalidate('proxy:nodes');
       if (io) io.emit('proxy_node_update', { action: 'created', node });
       res.json(node);
     } catch (e) {

@@ -1,6 +1,6 @@
 /**
  * MCP Server Route — Model Context Protocol (Streamable HTTP)
- * Vigil Security — 15 tools, 3 resources, 4 prompts
+ * Vigil Security — 22 tools, 6 resources, 7 prompts
  *
  * SDK: @modelcontextprotocol/sdk v1.x
  * Transport: Streamable HTTP (stateless, one request = one connection)
@@ -30,7 +30,7 @@ module.exports = function (app, ctx) {
     });
 
     // ════════════════════════════════════════════════════════════════════════
-    // TOOLS (15)
+    // TOOLS (22)
     // ════════════════════════════════════════════════════════════════════════
 
     // 1. check_posture
@@ -344,8 +344,151 @@ module.exports = function (app, ctx) {
       }
     });
 
+    // 16. run_code_audit
+    server.tool('run_code_audit', 'Run AI-powered source code vulnerability scan on a directory', {
+      target: z.string().describe('Directory path to scan (e.g., /app/routes)'),
+      languages: z.array(z.string()).default([]).describe('Languages to scan: javascript, typescript, python, ruby, php, java, go, csharp'),
+    }, async ({ target, languages }) => {
+      try {
+        const { discoverFiles, VULN_TYPES } = require('../lib/code-audit');
+        const files = discoverFiles(target, languages);
+        if (files.length === 0) return { content: [{ type: 'text', text: 'No source files found in ' + target }] };
+
+        // Start scan via API (background)
+        const http = require('http');
+        const body = JSON.stringify({ target, languages, vulnTypes: Object.keys(VULN_TYPES) });
+        const result = await new Promise((resolve, reject) => {
+          const r = http.request({ hostname: '127.0.0.1', port: process.env.VIGIL_PORT || 4100, path: '/api/code-audit', method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'MCP', Cookie: 'vigil_session=mcp-internal' }
+          }, (resp) => {
+            let d = ''; resp.on('data', c => d += c); resp.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve({ raw: d }); } });
+          });
+          r.on('error', reject); r.setTimeout(10000, () => { r.destroy(); reject(new Error('timeout')); });
+          r.write(body); r.end();
+        });
+
+        return { content: [{ type: 'text', text: `Code audit started. ${files.length} files found.\nScan ID: ${result.id || 'N/A'}\nCheck results with get_code_audit_results tool.` }] };
+      } catch (e) {
+        return { content: [{ type: 'text', text: 'Code audit error: ' + e.message }], isError: true };
+      }
+    });
+
+    // 17. get_code_audit_results
+    server.tool('get_code_audit_results', 'Get results of a code audit scan', {
+      scanId: z.string().default('latest').describe('Scan ID or "latest" for most recent code audit'),
+    }, async ({ scanId }) => {
+      try {
+        const scans = readJSON(path.join(DATA, 'scans.json'), []);
+        let scan;
+        if (scanId === 'latest') {
+          scan = scans.filter(s => s.scanType === 'code-audit').pop();
+        } else {
+          scan = scans.find(s => s.id === scanId);
+        }
+        if (!scan) return { content: [{ type: 'text', text: 'No code audit scan found' }] };
+        const summary = {
+          id: scan.id, status: scan.status, target: scan.target,
+          findingCount: (scan.findings || []).length,
+          findings: (scan.findings || []).slice(0, 10).map(f => ({
+            title: f.title, severity: f.severity, confidence: f.confidence, file: f.file, vulnType: f.vulnType,
+          })),
+          summary: scan.summary,
+        };
+        return { content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }] };
+      } catch (e) {
+        return { content: [{ type: 'text', text: 'Error: ' + e.message }], isError: true };
+      }
+    });
+
+    // 18. detect_waf
+    server.tool('detect_waf', 'Detect WAF/CDN on a target URL', {
+      target: z.string().describe('URL to scan (e.g., https://example.com)'),
+      probeMode: z.enum(['passive', 'active']).default('passive').describe('passive=headers only, active=send probe payloads'),
+    }, async ({ target, probeMode }) => {
+      try {
+        if (!/^https?:\/\//i.test(target)) target = 'https://' + target;
+        const http = require('http');
+        const body = JSON.stringify({ target, probeMode });
+        const result = await new Promise((resolve, reject) => {
+          const r = http.request({ hostname: '127.0.0.1', port: process.env.VIGIL_PORT || 4100, path: '/api/scan/waf', method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'MCP', Cookie: 'vigil_session=mcp-internal' }
+          }, (resp) => {
+            let d = ''; resp.on('data', c => d += c); resp.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve({ raw: d }); } });
+          });
+          r.on('error', reject); r.setTimeout(30000, () => { r.destroy(); reject(new Error('timeout')); });
+          r.write(body); r.end();
+        });
+
+        if (result.detected) {
+          return { content: [{ type: 'text', text: `WAF Detected: ${result.waf.name} (${result.waf.vendor})\nConfidence: ${result.confidence}%\nEvidence: ${(result.evidence || []).map(e => e.method + ': ' + e.detail).join(', ')}` }] };
+        }
+        return { content: [{ type: 'text', text: 'No WAF detected on ' + target }] };
+      } catch (e) {
+        return { content: [{ type: 'text', text: 'WAF detection error: ' + e.message }], isError: true };
+      }
+    });
+
+    // 19. list_proxy_nodes
+    server.tool('list_proxy_nodes', 'List ephemeral proxy nodes and tunnel status', {},
+      async () => {
+        try {
+          const proxy = require('../lib/ephemeral-proxy');
+          const status = proxy.getStatus();
+          return { content: [{ type: 'text', text: JSON.stringify(status, null, 2) }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: 'Error: ' + e.message }], isError: true };
+        }
+      }
+    );
+
+    // 20. create_proxy_node
+    server.tool('create_proxy_node', 'Create a disposable Codespace proxy node for anonymous scanning', {
+      repo: z.string().default('github/codespaces-blank').describe('GitHub repo for the Codespace'),
+      machineType: z.string().default('basicLinux32gb').describe('Machine type'),
+    }, async ({ repo, machineType }) => {
+      try {
+        const proxy = require('../lib/ephemeral-proxy');
+        const gh = await proxy.checkGHInstalled();
+        if (!gh.installed) return { content: [{ type: 'text', text: 'gh CLI not installed. Install with: apt install gh && gh auth login' }], isError: true };
+        const auth = await proxy.checkGHAuth();
+        if (!auth.authenticated) return { content: [{ type: 'text', text: 'GitHub not authenticated. Run: gh auth login' }], isError: true };
+        const node = await proxy.createCodespace(repo, machineType);
+        return { content: [{ type: 'text', text: 'Proxy node created: ' + node.name + '\nUse start_proxy_tunnel to connect.' }] };
+      } catch (e) {
+        return { content: [{ type: 'text', text: 'Create error: ' + e.message }], isError: true };
+      }
+    });
+
+    // 21. start_proxy_tunnel
+    server.tool('start_proxy_tunnel', 'Start SOCKS5 tunnel through a proxy node', {
+      name: z.string().describe('Codespace name'),
+      port: z.number().default(1080).describe('Local SOCKS5 port'),
+    }, async ({ name, port }) => {
+      try {
+        const proxy = require('../lib/ephemeral-proxy');
+        const result = await proxy.startTunnel(name, port);
+        return { content: [{ type: 'text', text: `Tunnel ${result.status}: SOCKS5 at 127.0.0.1:${result.port}\nExit IP: ${result.exitIP || 'detecting...'}` }] };
+      } catch (e) {
+        return { content: [{ type: 'text', text: 'Tunnel error: ' + e.message }], isError: true };
+      }
+    });
+
+    // 22. plan_proxy_infrastructure
+    server.tool('plan_proxy_infrastructure', 'AI-plan disposable proxy infrastructure for an engagement', {
+      engagement: z.string().describe('Engagement description (scope, targets, scan types, timeline)'),
+    }, async ({ engagement }) => {
+      try {
+        if (!ctx.askAIJSON) return { content: [{ type: 'text', text: 'AI not configured' }], isError: true };
+        const prompt = `You are a penetration testing infrastructure planner. Recommend disposable proxy infrastructure for:\n\n${engagement}\n\nRespond concisely: recommended node count, IP rotation frequency (minutes), scan strategy (sequential/parallel/round-robin), OPSEC level, and which scan phases need proxying.`;
+        const result = await ctx.askAI(prompt, { timeout: 30000 });
+        return { content: [{ type: 'text', text: result || 'No response' }] };
+      } catch (e) {
+        return { content: [{ type: 'text', text: 'Planning error: ' + e.message }], isError: true };
+      }
+    });
+
     // ════════════════════════════════════════════════════════════════════════
-    // RESOURCES (3)
+    // RESOURCES (6)
     // ════════════════════════════════════════════════════════════════════════
 
     server.resource('posture', 'vigil://posture', { description: 'Current security posture overview' },
@@ -385,8 +528,39 @@ module.exports = function (app, ctx) {
       }
     );
 
+    server.resource('code-audit-findings', 'vigil://code-audit-findings', { description: 'Code audit vulnerability findings' },
+      async (uri) => {
+        const scans = readJSON(path.join(DATA, 'scans.json'), []);
+        const codeScans = scans.filter(s => s.scanType === 'code-audit');
+        const findings = [];
+        for (const s of codeScans) {
+          if (s.findings) findings.push(...s.findings.map(f => ({ ...f, scanId: s.id, target: s.target })));
+        }
+        return { contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(findings, null, 2) }] };
+      }
+    );
+
+    server.resource('waf-signatures', 'vigil://waf-signatures', { description: 'WAF detection signature database' },
+      async (uri) => {
+        const sigs = ['Cloudflare', 'AWS WAF', 'AWS CloudFront', 'Akamai', 'Imperva/Incapsula', 'F5 BIG-IP ASM', 'FortiWeb', 'ModSecurity', 'Barracuda', 'Citrix NetScaler', 'Sucuri', 'Palo Alto', 'Google Cloud Armor', 'Fastly', 'DataDome', 'PerimeterX', 'Wordfence', 'Azure Front Door', 'DDoS-Guard', 'StackPath', 'KeyCDN', 'Edgecast/Verizon', 'Radware', 'SonicWall', 'Wallarm', 'Reblaze', 'Comodo/cWatch', 'Armor Defense', 'Alert Logic', 'Signal Sciences'];
+        return { contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify({ count: sigs.length, signatures: sigs }, null, 2) }] };
+      }
+    );
+
+    server.resource('proxy-nodes', 'vigil://proxy-nodes', { description: 'Ephemeral proxy node status' },
+      async (uri) => {
+        try {
+          const proxy = require('../lib/ephemeral-proxy');
+          const status = proxy.getStatus();
+          return { contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(status, null, 2) }] };
+        } catch {
+          return { contents: [{ uri: uri.href, mimeType: 'application/json', text: '{"nodes":[],"activeTunnels":[]}' }] };
+        }
+      }
+    );
+
     // ════════════════════════════════════════════════════════════════════════
-    // PROMPTS (4)
+    // PROMPTS (7)
     // ════════════════════════════════════════════════════════════════════════
 
     server.prompt('security_audit', 'Full security assessment of the system', {},
@@ -422,6 +596,33 @@ module.exports = function (app, ctx) {
       messages: [{
         role: 'user',
         content: { type: 'text', text: `Assess compliance with ${framework}. Use compliance_check to evaluate the framework, check_posture for security score, and list_findings for vulnerabilities. Generate a compliance report with findings, gaps, and a remediation roadmap.` },
+      }],
+    }));
+
+    server.prompt('code_security_review', 'AI-powered source code security review', {
+      target: z.string().default('/app/routes').describe('Directory path to audit'),
+    }, ({ target }) => ({
+      messages: [{
+        role: 'user',
+        content: { type: 'text', text: `Perform an AI-powered code security review of "${target}". Use run_code_audit to start the scan, then get_code_audit_results to retrieve findings. Read the vigil://code-audit-findings resource for context. Analyze each finding, assess exploitability, and provide prioritized remediation recommendations.` },
+      }],
+    }));
+
+    server.prompt('waf_reconnaissance', 'WAF detection and analysis for a target', {
+      target: z.string().describe('Target URL to fingerprint'),
+    }, ({ target }) => ({
+      messages: [{
+        role: 'user',
+        content: { type: 'text', text: `Perform WAF reconnaissance on "${target}". Use detect_waf with passive mode first, then active mode if needed. Read vigil://waf-signatures for the full signature database. Analyze the detected WAF, explain its capabilities and known bypass techniques, and recommend a penetration testing strategy that accounts for the WAF presence.` },
+      }],
+    }));
+
+    server.prompt('anonymous_pentest_setup', 'Plan and provision anonymous scanning infrastructure', {
+      engagement: z.string().describe('Engagement scope and requirements'),
+    }, ({ engagement }) => ({
+      messages: [{
+        role: 'user',
+        content: { type: 'text', text: `Plan anonymous scanning infrastructure for: "${engagement}". Use plan_proxy_infrastructure for AI recommendations. Check vigil://proxy-nodes for existing nodes. Use list_proxy_nodes to see current status. If nodes are needed, use create_proxy_node and start_proxy_tunnel. Provide a complete infrastructure setup plan with OPSEC considerations.` },
       }],
     }));
 
@@ -503,9 +704,9 @@ module.exports = function (app, ctx) {
       url: mcpUrl,
       transport: 'streamable-http',
       version: '1.0.0',
-      tools: 15,
-      resources: 3,
-      prompts: 4,
+      tools: 22,
+      resources: 6,
+      prompts: 7,
       instructions: {
         claudeDesktop: {
           config: {

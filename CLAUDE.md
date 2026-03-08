@@ -206,7 +206,7 @@ public/
 - Each customer's MCP server is isolated in their own container sandbox -- tenant-scoped, auth-gated.
 - SDK: `@modelcontextprotocol/sdk` + Zod schemas
 
-### Tools (25+)
+### Tools (22)
 ```
 # Scanning
 run_nmap_scan            -> Execute nmap scan (ports, hosts, flags)
@@ -248,6 +248,19 @@ get_scan_results         -> Get results from a specific scan
 get_security_posture     -> Overall security posture score + breakdown
 get_system_metrics       -> CPU, memory, disk, network metrics
 get_alert_summary        -> Active alerts summary by severity
+
+# Code Audit
+run_code_audit           -> Start AI-powered source code vulnerability scan
+get_code_audit_results   -> Get code audit findings (by ID or latest)
+
+# WAF Detection
+detect_waf               -> Fingerprint WAF/CDN on a target URL
+
+# Proxy Nodes
+list_proxy_nodes         -> List ephemeral proxy nodes + tunnel status
+create_proxy_node        -> Create disposable Codespace proxy
+start_proxy_tunnel       -> Start SOCKS5 tunnel through proxy node
+plan_proxy_infrastructure -> AI-plan proxy infrastructure for engagement
 ```
 
 ### Tool Annotations
@@ -255,16 +268,21 @@ get_alert_summary        -> Active alerts summary by severity
 - `destructiveHint: true` -- operations that modify state (create incident, run destructive scan)
 
 ### Resources
-- `vigil://security-posture` -- Current security posture overview
-- `vigil://scan-summary` -- Recent scan results summary
-- `vigil://vulnerability-summary` -- Open vulnerability summary
+- `vigil://posture` -- Current security posture overview
+- `vigil://threats` -- Active security threats
+- `vigil://findings` -- Open vulnerability findings
+- `vigil://code-audit-findings` -- Code audit vulnerability findings
+- `vigil://waf-signatures` -- WAF detection signature database (30+)
+- `vigil://proxy-nodes` -- Ephemeral proxy node status
 
 ### Prompts
 - `security_audit` -- Full security audit report generation
 - `incident_response` -- Incident response playbook execution
-- `vulnerability_assessment` -- Vulnerability assessment with AI triage
-- `compliance_review` -- Compliance gap analysis against framework
 - `threat_briefing` -- Daily threat intelligence briefing
+- `compliance_report` -- Compliance gap analysis against framework
+- `code_security_review` -- AI-powered source code security review
+- `waf_reconnaissance` -- WAF detection and bypass analysis
+- `anonymous_pentest_setup` -- Plan and provision anonymous scanning infra
 
 ### GUI Test Endpoint
 - `POST /api/mcp/test` uses InMemoryTransport (bypasses HTTP handshake)

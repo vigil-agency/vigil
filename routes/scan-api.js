@@ -768,7 +768,15 @@ Focus on: attack surface, email security posture, DNS hijacking risk, certificat
       if (!isValidURL(target)) return res.status(400).json({ error: 'Invalid URL format. Use http:// or https://' });
 
       const mode = probe_mode === 'active' ? 'active' : 'passive';
+
+      // Check cache (WAF rarely changes — 1 hour TTL)
+      const neuralCache = require('../lib/neural-cache');
+      const cacheKey = 'waf:' + target + ':' + mode;
+      const cached = neuralCache.get(cacheKey);
+      if (cached) { return res.json(cached); }
+
       const result = await detectWAF(target, mode);
+      neuralCache.set(cacheKey, result, 3600000); // 1 hour
 
       saveScanResult('waf', target, result.findings.map(f => ({
         id: crypto.randomUUID(),
