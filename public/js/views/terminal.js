@@ -360,20 +360,41 @@
       sock.on('terminal_output', function (data) {
         if (!term) return;
         term.write(data);
-        if (typeof data === 'string' && data.indexOf('[Process exited]') !== -1) {
-          termStarted = false;
-          updateStatus(false);
-        }
       });
+      // Replay buffered output on reattach (server sends full buffer)
+      sock.on('terminal_replay', function (data) {
+        if (!term) return;
+        term.clear();
+        term.write(data);
+      });
+      // PTY process exited (user typed exit, shell crashed)
+      sock.on('terminal_exited', function () {
+        termStarted = false;
+        updateStatus(false);
+      });
+      // Successful reattach to existing PTY session
+      sock.on('terminal_reattach_ok', function () {
+        termStarted = true;
+        updateStatus(true);
+      });
+      // No existing PTY to reattach — auto-start fresh session
+      sock.on('terminal_reattach_fail', function () {
+        termStarted = false;
+        updateStatus(false);
+        startTerminalSession();
+      });
+      // On socket reconnect: try to reattach to surviving PTY
       sock.on('connect', function () {
         if (termStarted) {
+          // We thought we were connected — socket dropped, try reattach
           termStarted = false;
           updateStatus(false);
-          if (term) term.write('\r\n\x1b[33m[Reconnected — session ended]\x1b[0m\r\n');
+          if (term) term.write('\r\n\x1b[33m[Reconnecting...]\x1b[0m\r\n');
+          sock.emit('terminal_reattach', { cols: term ? term.cols : 80, rows: term ? term.rows : 24 });
         }
       });
     }
-    term.write('\x1b[36m  Vigil Command Center\x1b[0m\r\n\x1b[90m  Ctrl+` toggle | Ctrl+Shift+` resize\x1b[0m\r\n\r\n');
+    term.write('\x1b[36m  Vigil Command Center\x1b[0m\r\n\x1b[90m  Ctrl+` toggle | Ctrl+Shift+` resize | Session persists across reloads\x1b[0m\r\n\r\n');
   }
 
   function startTerminalSession() {
@@ -385,6 +406,8 @@
     termStarted = true;
     updateStatus(true);
     term.focus();
+    // terminal_start on server will reattach if a PTY already exists
+    // for this user, or create a new one if not
     sock.emit('terminal_start', { cols: term.cols || 80, rows: term.rows || 24 });
   }
 

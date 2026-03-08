@@ -171,9 +171,107 @@ module.exports = function (app, ctx) {
     });
   });
 
-  // ── Terminal Management (node-pty) ──────────────────────────────────────
+  // ── Terminal Management (node-pty) — Persistent Sessions ─────────────
+  //
+  // PTY sessions are keyed by username (not socket.id) so they survive
+  // page reloads & socket reconnections. On disconnect a grace period
+  // keeps the PTY alive; on reconnect the client reattaches and replays
+  // buffered output.
 
-  let terminals = new Map();
+  const TERM_BUFFER_SIZE = 50000;      // chars to keep for replay
+  const TERM_GRACE_PERIOD = 5 * 60000; // 5 min before orphan kill
+
+  // Map<username, { term, sockets: Set<socket>, buffer: string, graceTimer }>
+  let termSessions = new Map();
+
+  function getTermSession(username) {
+    return termSessions.get(username) || null;
+  }
+
+  function appendBuffer(sess, data) {
+    sess.buffer += data;
+    if (sess.buffer.length > TERM_BUFFER_SIZE) {
+      sess.buffer = sess.buffer.slice(-TERM_BUFFER_SIZE);
+    }
+  }
+
+  function emitToSession(sess, event, data) {
+    for (const s of sess.sockets) {
+      s.emit(event, data);
+    }
+  }
+
+  function createTermSession(username, socket, cols, rows) {
+    try {
+      const pty = require('node-pty');
+      const shell = process.platform === 'win32' ? 'powershell.exe' : (process.env.SHELL || '/bin/bash');
+
+      // Filter sensitive env vars
+      const safeEnv = { ...process.env };
+      const sensitiveKeys = ['ENCRYPTION_KEY', 'DATABASE_URL', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN', 'GITHUB_TOKEN', 'STRIPE_SECRET_KEY', 'JWT_SECRET', 'CLAUDECODE'];
+      sensitiveKeys.forEach(k => delete safeEnv[k]);
+
+      const term = pty.spawn(shell, [], {
+        name: 'xterm-color',
+        cols: cols || 80,
+        rows: rows || 24,
+        cwd: REPO_DIR,
+        env: safeEnv,
+      });
+
+      const sess = {
+        term,
+        sockets: new Set([socket]),
+        buffer: '',
+        graceTimer: null,
+      };
+
+      term.onData((data) => {
+        appendBuffer(sess, data);
+        emitToSession(sess, 'terminal_output', data);
+      });
+
+      term.onExit(() => {
+        // PTY process ended (user typed exit, shell crashed, etc.)
+        emitToSession(sess, 'terminal_output', '\r\n\x1b[33m[Process exited]\x1b[0m\r\n');
+        emitToSession(sess, 'terminal_exited', {});
+        if (sess.graceTimer) clearTimeout(sess.graceTimer);
+        termSessions.delete(username);
+      });
+
+      termSessions.set(username, sess);
+      return sess;
+    } catch (e) {
+      socket.emit('terminal_output', '\r\n[ERROR] Terminal not available: ' + e.message + '\r\n');
+      return null;
+    }
+  }
+
+  function detachSocket(username, socket) {
+    const sess = termSessions.get(username);
+    if (!sess) return;
+    sess.sockets.delete(socket);
+    // If no more sockets connected, start grace period
+    if (sess.sockets.size === 0) {
+      sess.graceTimer = setTimeout(() => {
+        // Grace expired — kill orphaned PTY
+        try { sess.term.kill(); } catch {}
+        termSessions.delete(username);
+      }, TERM_GRACE_PERIOD);
+    }
+  }
+
+  function attachSocket(username, socket) {
+    const sess = termSessions.get(username);
+    if (!sess) return false;
+    // Cancel grace timer if running
+    if (sess.graceTimer) {
+      clearTimeout(sess.graceTimer);
+      sess.graceTimer = null;
+    }
+    sess.sockets.add(socket);
+    return true;
+  }
 
   // Socket.IO events for terminal — verify auth on connection
   io.on('connection', (socket) => {
@@ -190,49 +288,53 @@ module.exports = function (app, ctx) {
     }
     socket.user = { username: session.username, role: session.role };
 
+    // ── terminal_start: create new PTY or reattach to existing ──
     socket.on('terminal_start', (data) => {
-      try {
-        const pty = require('node-pty');
-        const shell = process.platform === 'win32' ? 'powershell.exe' : (process.env.SHELL || '/bin/bash');
+      const username = socket.user.username;
+      const cols = (data && data.cols) || 80;
+      const rows = (data && data.rows) || 24;
+
+      const existing = getTermSession(username);
+      if (existing) {
+        // Reattach to existing session
+        attachSocket(username, socket);
+        // Replay buffer so client sees previous output
+        if (existing.buffer) socket.emit('terminal_replay', existing.buffer);
+        socket.emit('terminal_reattach_ok', { reattached: true });
+        // Resize to match new client
+        try { existing.term.resize(cols, rows); } catch {}
+        return;
+      }
+
+      // Create fresh PTY session
+      createTermSession(username, socket, cols, rows);
+    });
+
+    // ── terminal_reattach: explicit reattach attempt (on reconnect) ──
+    socket.on('terminal_reattach', (data) => {
+      const username = socket.user.username;
+      const existing = getTermSession(username);
+      if (existing) {
+        attachSocket(username, socket);
+        if (existing.buffer) socket.emit('terminal_replay', existing.buffer);
+        socket.emit('terminal_reattach_ok', { reattached: true });
         const cols = (data && data.cols) || 80;
         const rows = (data && data.rows) || 24;
-
-        // Filter sensitive env vars before passing to terminal
-        const safeEnv = { ...process.env };
-        const sensitiveKeys = ['ENCRYPTION_KEY', 'DATABASE_URL', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN', 'GITHUB_TOKEN', 'STRIPE_SECRET_KEY', 'JWT_SECRET', 'CLAUDECODE'];
-        sensitiveKeys.forEach(k => delete safeEnv[k]);
-
-        const term = pty.spawn(shell, [], {
-          name: 'xterm-color',
-          cols,
-          rows,
-          cwd: REPO_DIR,
-          env: safeEnv,
-        });
-
-        terminals.set(socket.id, term);
-
-        term.onData((data) => {
-          socket.emit('terminal_output', data);
-        });
-
-        term.onExit(() => {
-          terminals.delete(socket.id);
-        });
-      } catch (e) {
-        socket.emit('terminal_output', '\r\n[ERROR] Terminal not available: ' + e.message + '\r\n');
+        try { existing.term.resize(cols, rows); } catch {}
+      } else {
+        socket.emit('terminal_reattach_fail', {});
       }
     });
 
     socket.on('terminal_input', (data) => {
-      const term = terminals.get(socket.id);
-      if (term) term.write(data);
+      const sess = getTermSession(socket.user.username);
+      if (sess) sess.term.write(data);
     });
 
     socket.on('terminal_resize', (data) => {
-      const term = terminals.get(socket.id);
-      if (term && data && data.cols && data.rows) {
-        try { term.resize(data.cols, data.rows); } catch {}
+      const sess = getTermSession(socket.user.username);
+      if (sess && data && data.cols && data.rows) {
+        try { sess.term.resize(data.cols, data.rows); } catch {}
       }
     });
 
@@ -244,11 +346,8 @@ module.exports = function (app, ctx) {
     });
 
     socket.on('disconnect', () => {
-      const term = terminals.get(socket.id);
-      if (term) {
-        try { term.kill(); } catch {}
-        terminals.delete(socket.id);
-      }
+      // Don't kill PTY — detach socket and start grace period
+      detachSocket(socket.user.username, socket);
     });
   });
 };
