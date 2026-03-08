@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://vigil.agency/docs.html
+    about: Read the docs before opening an issue
+  - name: Discussions
+    url: https://github.com/vigil-agency/vigil/discussions
+    about: Ask questions and share ideas
+  - name: Security Vulnerability
+    url: https://github.com/vigil-agency/vigil/security/advisories/new
+    about: Report security vulnerabilities privately
