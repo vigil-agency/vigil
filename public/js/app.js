@@ -42,7 +42,7 @@
     var _redirecting = false;
     window.fetch = function(url, opts) {
       return _origFetch.call(this, url, opts).then(function(response) {
-        if (response.status === 401 && typeof url === 'string' && url.indexOf('/api/') !== -1 && !_redirecting) {
+        if (response.status === 401 && typeof url === 'string' && url.indexOf('/api/') !== -1 && url.indexOf('/api/auth/') === -1 && State.user && !_redirecting) {
           _redirecting = true;
           Toast.warning('Session expired — logging in again');
           setTimeout(function() { _redirecting = false; window.location.reload(); }, 1500);
@@ -432,6 +432,7 @@
 
     initSidebar();
     initSocket();
+    initBell();
     showView('dashboard');
   }
 
@@ -660,7 +661,6 @@
   document.addEventListener('DOMContentLoaded', function() {
     initLoginForm();
     initUserMenu();
-    initBell();
 
     checkAuth().then(function(authed) {
       if (authed) {
