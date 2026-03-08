@@ -3,9 +3,11 @@
   "version": "1.0.0",
   "description": "The Security Agency That Never Sleeps — AI-powered security operations platform",
   "main": "server.js",
+  "private": true,
+  "engines": { "node": ">=18.0.0" },
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node --watch server.js"
   },
   "keywords": ["security", "ai", "mcp", "soc", "vulnerability-scanner", "threat-detection"],
   "author": "Vigil Agency <hello@vigil.agency>",

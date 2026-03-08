@@ -54,19 +54,54 @@ if [ ! -f .env ]; then
   echo "Created .env from .env.example"
 
   # Generate random admin password
-  ADMIN_PASS=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 16)
-  sed -i "s/VIGIL_PASS=admin/VIGIL_PASS=$ADMIN_PASS/" .env
+  ADMIN_PASS=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 16)
+  sed -i "s|VIGIL_PASS=admin|VIGIL_PASS=$ADMIN_PASS|" .env
   echo ""
   echo "  Generated admin password: $ADMIN_PASS"
   echo "  (saved in .env — change if desired)"
   echo ""
+else
+  echo ".env already exists — skipping setup"
 fi
 
 # ── Install ───────────────────────────────────────────────────────
 echo "Installing dependencies..."
-npm install --production
+npm install --production || {
+  echo "Error: npm install failed"
+  exit 1
+}
 
-# ── Check optional scanners ───────────────────────────────────────
+# ── Install scanners (Debian/Ubuntu/Kali) ─────────────────────────
+if command -v apt-get >/dev/null 2>&1; then
+  echo ""
+  echo "Debian-based system detected. Install security scanners? [y/N]"
+  read -r INSTALL_SCANNERS </dev/tty 2>/dev/null || INSTALL_SCANNERS="n"
+  if [[ "$INSTALL_SCANNERS" =~ ^[Yy]$ ]]; then
+    echo "Installing scanners (requires sudo)..."
+    sudo apt-get update -qq
+    sudo apt-get install -y -qq nmap nikto dnsutils whois openssl >/dev/null 2>&1 && echo "  ✓ apt scanners installed"
+
+    # Nuclei
+    if ! command -v nuclei >/dev/null 2>&1; then
+      echo "  Installing nuclei..."
+      NUCLEI_VER=$(curl -sL https://api.github.com/repos/projectdiscovery/nuclei/releases/latest | grep '"tag_name"' | head -1 | cut -d'"' -f4 | tr -d v)
+      if [ -n "$NUCLEI_VER" ]; then
+        curl -sL "https://github.com/projectdiscovery/nuclei/releases/download/v${NUCLEI_VER}/nuclei_${NUCLEI_VER}_linux_amd64.zip" -o /tmp/nuclei.zip && \
+          sudo unzip -qo /tmp/nuclei.zip -d /usr/local/bin/ && rm -f /tmp/nuclei.zip && echo "  ✓ nuclei $NUCLEI_VER"
+      else
+        echo "  ✗ nuclei (could not fetch version — install manually)"
+      fi
+    fi
+
+    # Trivy
+    if ! command -v trivy >/dev/null 2>&1; then
+      echo "  Installing trivy..."
+      curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin >/dev/null 2>&1 && echo "  ✓ trivy" || echo "  ✗ trivy (install manually: https://trivy.dev)"
+    fi
+  fi
+fi
+
+# ── Check scanner availability ────────────────────────────────────
 echo ""
 echo "Scanner availability:"
 for tool in nmap nuclei trivy nikto openssl dig whois; do
@@ -82,7 +117,10 @@ echo ""
 echo "Starting Vigil on port $PORT..."
 echo "  URL:  http://localhost:$PORT"
 echo "  User: admin"
-echo "  Pass: (see .env file)"
+if [ -f .env ]; then
+  PASS=$(grep '^VIGIL_PASS=' .env | cut -d'=' -f2-)
+  echo "  Pass: $PASS"
+fi
 echo ""
 echo "  Stop with Ctrl+C"
 echo ""

@@ -2,13 +2,13 @@
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV NODE_ENV=production
 
-# System packages
+# System packages + security scanners
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl gnupg ca-certificates git openssh-client bash sudo \
+    curl gnupg ca-certificates unzip git openssh-client bash \
     python3 make g++ \
     procps htop net-tools iproute2 lsb-release \
-    # Security tools
     nmap nikto dnsutils whois \
     openssl libssl-dev \
     cron \
@@ -25,35 +25,32 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
 
-# Docker CLI
+# Docker CLI (for container security scanning)
 RUN install -m 0755 -d /etc/apt/keyrings && \
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" > /etc/apt/sources.list.d/docker.list && \
     apt-get update && apt-get install -y --no-install-recommends docker-ce-cli && \
     rm -rf /var/lib/apt/lists/*
 
-# Nuclei scanner
-RUN curl -sL https://github.com/projectdiscovery/nuclei/releases/latest/download/nuclei_$(curl -sL https://api.github.com/repos/projectdiscovery/nuclei/releases/latest | grep tag_name | cut -d'"' -f4 | tr -d v)_linux_amd64.zip -o /tmp/nuclei.zip 2>/dev/null && \
-    unzip -q /tmp/nuclei.zip -d /usr/local/bin/ 2>/dev/null && rm -f /tmp/nuclei.zip || true
+# Nuclei scanner (pinned version with fallback)
+RUN NUCLEI_VER=$(curl -sL https://api.github.com/repos/projectdiscovery/nuclei/releases/latest | grep '"tag_name"' | head -1 | cut -d'"' -f4 | tr -d v) && \
+    if [ -n "$NUCLEI_VER" ]; then \
+      curl -sL "https://github.com/projectdiscovery/nuclei/releases/download/v${NUCLEI_VER}/nuclei_${NUCLEI_VER}_linux_amd64.zip" -o /tmp/nuclei.zip && \
+      unzip -qo /tmp/nuclei.zip -d /usr/local/bin/ && rm -f /tmp/nuclei.zip && \
+      echo "Nuclei $NUCLEI_VER installed"; \
+    else echo "WARNING: Could not install nuclei — API rate limited"; fi
 
 # Trivy scanner
-RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin 2>/dev/null || true
+RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin && \
+    echo "Trivy installed" || echo "WARNING: Could not install trivy"
 
-# AI CLIs (BYOK) — install globally + symlink to /usr/local/bin
-RUN npm install -g @anthropic-ai/claude-code @openai/codex 2>/dev/null || true && \
-    NPM_BIN=$(npm prefix -g)/bin && \
-    for bin in claude codex; do \
-      [ -f "$NPM_BIN/$bin" ] && [ ! -f "/usr/local/bin/$bin" ] && ln -sf "$NPM_BIN/$bin" /usr/local/bin/$bin; \
-    done; true
-
-# Non-root user
-RUN useradd -m -s /bin/bash -G sudo vigil && \
-    echo 'vigil ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+# Non-root user (no sudo in production)
+RUN useradd -m -s /bin/bash vigil
 
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm install --production
+RUN npm ci --production
 
 COPY server.js ./
 COPY routes/ ./routes/
@@ -64,7 +61,6 @@ COPY public/ ./public/
 
 RUN mkdir -p /app/data/reports /app/data/backups && chown -R vigil:vigil /app
 
-ENV NODE_ENV=production
 ENV VIGIL_PORT=4100
 
 EXPOSE 4100
