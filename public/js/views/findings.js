@@ -41,6 +41,7 @@ Views.findings = {
           '<option value="nmap">Nmap</option>' +
           '<option value="zap">ZAP</option>' +
           '<option value="trivy">Trivy</option>' +
+          '<option value="code-audit">Code Audit</option>' +
         '</select>' +
         '<input type="text" class="form-input" id="findings-search" placeholder="Search findings..." style="max-width:200px;">' +
       '</div>' +
@@ -116,7 +117,7 @@ Views.findings = {
     var filtered = this._allFindings.filter(function(f) {
       if (sev !== 'all' && (f.severity || '').toLowerCase() !== sev) return false;
       if (status !== 'all' && (f.status || 'open') !== status) return false;
-      if (type !== 'all' && (f.scan_type || '').toLowerCase() !== type) return false;
+      if (type !== 'all' && (f.scanType || f.scan_type || '').toLowerCase() !== type) return false;
       if (search && !(f.title || '').toLowerCase().includes(search) && !(f.target || '').toLowerCase().includes(search)) return false;
       return true;
     });

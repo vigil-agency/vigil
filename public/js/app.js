@@ -173,6 +173,7 @@
     'container-security': 'Container Security',
     'ssl-monitor': 'SSL Monitor',
     'dns-security': 'DNS Security',
+    'code-audit': 'Code Audit',
     'osint': 'OSINT',
     'findings': 'Findings',
     'timeline': 'Attack Timeline',
