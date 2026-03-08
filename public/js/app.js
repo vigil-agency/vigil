@@ -36,11 +36,19 @@
     }
   };
 
-  // ── Global 401 interceptor — catches expired sessions on ALL API calls ──
+  // ── Global fetch interceptor — CSRF header + 401 redirect on ALL API calls ──
   (function() {
     var _origFetch = window.fetch;
     var _redirecting = false;
     window.fetch = function(url, opts) {
+      // Auto-add X-Requested-With on API calls to satisfy CSRF check
+      if (typeof url === 'string' && url.indexOf('/api/') !== -1) {
+        opts = Object.assign({}, opts);
+        opts.headers = new Headers(opts.headers || {});
+        if (!opts.headers.has('X-Requested-With')) {
+          opts.headers.set('X-Requested-With', 'Vigil');
+        }
+      }
       return _origFetch.call(this, url, opts).then(function(response) {
         if (response.status === 401 && typeof url === 'string' && url.indexOf('/api/') !== -1 && url.indexOf('/api/auth/') === -1 && State.user && !_redirecting) {
           _redirecting = true;
