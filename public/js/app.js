@@ -681,4 +681,235 @@
     });
   });
 
+  // ── Keyboard Shortcuts ──
+  function isInputFocused() {
+    var el = document.activeElement;
+    if (!el) return false;
+    var tag = el.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+  }
+
+  function initHotkeys() {
+    document.addEventListener('keydown', function(e) {
+      var key = e.key;
+      var ctrl = e.ctrlKey || e.metaKey;
+      var shift = e.shiftKey;
+
+      // ── Ctrl+K — Command Palette ──
+      if (ctrl && key === 'k') {
+        e.preventDefault();
+        toggleCommandPalette();
+        return;
+      }
+
+      // ── Ctrl+B — Toggle Sidebar ──
+      if (ctrl && key === 'b' && !shift) {
+        e.preventDefault();
+        var sidebar = document.getElementById('sidebar');
+        if (sidebar) sidebar.classList.toggle('collapsed');
+        return;
+      }
+
+      // ── Ctrl+Shift+R — Refresh Current View ──
+      if (ctrl && shift && key === 'R') {
+        e.preventDefault();
+        if (State.currentView && Views[State.currentView] && Views[State.currentView].show) {
+          Views[State.currentView].show();
+          Toast.info('View refreshed');
+        }
+        return;
+      }
+
+      // ── Escape — Close palette/overlays ──
+      if (key === 'Escape') {
+        var palette = document.getElementById('command-palette');
+        if (palette && palette.style.display !== 'none') {
+          palette.style.display = 'none';
+          return;
+        }
+        var helpOverlay = document.getElementById('hotkey-help');
+        if (helpOverlay && helpOverlay.style.display !== 'none') {
+          helpOverlay.style.display = 'none';
+          return;
+        }
+      }
+
+      // Below here: skip if in input field
+      if (isInputFocused()) return;
+
+      // ── ? — Hotkey Help ──
+      if (key === '?' && !ctrl) {
+        e.preventDefault();
+        toggleHotkeyHelp();
+        return;
+      }
+
+      // ── Number keys — Quick Navigation ──
+      if (!ctrl && !shift && !e.altKey) {
+        switch (key) {
+          case '1': showView('dashboard'); Toast.info('Dashboard'); return;
+          case '2': showView('findings'); Toast.info('Findings'); return;
+          case '3': showView('port-scanner'); Toast.info('Port Scanner'); return;
+          case '4': showView('web-scanner'); Toast.info('Web Scanner'); return;
+          case '5': showView('agents'); Toast.info('Security Agents'); return;
+          case '6': showView('ai-chat'); Toast.info('AI Chat'); return;
+          case '7': showView('settings'); Toast.info('Settings'); return;
+        }
+      }
+    });
+  }
+
+  // ── Command Palette ──
+  function toggleCommandPalette() {
+    var palette = document.getElementById('command-palette');
+    if (!palette) {
+      palette = document.createElement('div');
+      palette.id = 'command-palette';
+      palette.style.cssText = 'display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:10000;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);';
+      palette.innerHTML =
+        '<div style="max-width:520px;margin:80px auto;background:var(--surface-solid);border:1px solid var(--border-glass);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.5);overflow:hidden;">' +
+          '<div style="padding:12px 16px;border-bottom:1px solid var(--border);">' +
+            '<input type="text" id="cmd-palette-input" placeholder="Type to search views..." style="width:100%;background:transparent;border:none;outline:none;color:var(--text-primary);font-size:var(--font-size-base);font-family:var(--font-mono);">' +
+          '</div>' +
+          '<div id="cmd-palette-results" style="max-height:360px;overflow-y:auto;padding:4px;"></div>' +
+          '<div style="padding:8px 16px;border-top:1px solid var(--border);display:flex;gap:16px;color:var(--text-tertiary);font-size:var(--font-size-xs);">' +
+            '<span><kbd style="background:var(--well);padding:1px 5px;border-radius:3px;font-family:var(--font-mono);">&#8593;&#8595;</kbd> Navigate</span>' +
+            '<span><kbd style="background:var(--well);padding:1px 5px;border-radius:3px;font-family:var(--font-mono);">Enter</kbd> Go</span>' +
+            '<span><kbd style="background:var(--well);padding:1px 5px;border-radius:3px;font-family:var(--font-mono);">Esc</kbd> Close</span>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(palette);
+
+      palette.addEventListener('click', function(e) {
+        if (e.target === palette) palette.style.display = 'none';
+      });
+
+      var input = document.getElementById('cmd-palette-input');
+      input.addEventListener('input', function() { filterPalette(input.value); });
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'ArrowDown') { e.preventDefault(); movePaletteSelection(1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); movePaletteSelection(-1); }
+        else if (e.key === 'Enter') {
+          e.preventDefault();
+          var active = document.querySelector('#cmd-palette-results .cmd-item.active');
+          if (active) {
+            palette.style.display = 'none';
+            showView(active.getAttribute('data-view'));
+          }
+        }
+      });
+    }
+
+    if (palette.style.display === 'none') {
+      palette.style.display = 'block';
+      var input = document.getElementById('cmd-palette-input');
+      input.value = '';
+      filterPalette('');
+      input.focus();
+    } else {
+      palette.style.display = 'none';
+    }
+  }
+
+  function filterPalette(query) {
+    var results = document.getElementById('cmd-palette-results');
+    var q = query.toLowerCase();
+    var items = Object.keys(viewNames).filter(function(key) {
+      if (!q) return true;
+      return key.toLowerCase().indexOf(q) >= 0 || viewNames[key].toLowerCase().indexOf(q) >= 0;
+    });
+
+    var html = '';
+    items.forEach(function(key, i) {
+      var isActive = i === 0 ? ' active' : '';
+      var isCurrent = key === State.currentView ? ' style="color:var(--cyan);"' : '';
+      html += '<div class="cmd-item' + isActive + '" data-view="' + key + '" style="padding:8px 12px;cursor:pointer;border-radius:6px;display:flex;justify-content:space-between;align-items:center;">' +
+        '<span' + isCurrent + '>' + escapeHtml(viewNames[key]) + '</span>' +
+        '<span style="color:var(--text-tertiary);font-size:var(--font-size-xs);font-family:var(--font-mono);">' + escapeHtml(key) + '</span>' +
+      '</div>';
+    });
+    results.innerHTML = html || '<div style="padding:16px;text-align:center;color:var(--text-tertiary);">No matching views</div>';
+
+    results.querySelectorAll('.cmd-item').forEach(function(item) {
+      item.addEventListener('mouseenter', function() {
+        results.querySelectorAll('.cmd-item').forEach(function(i) { i.classList.remove('active'); });
+        item.classList.add('active');
+      });
+      item.addEventListener('click', function() {
+        document.getElementById('command-palette').style.display = 'none';
+        showView(item.getAttribute('data-view'));
+      });
+    });
+  }
+
+  function movePaletteSelection(dir) {
+    var items = document.querySelectorAll('#cmd-palette-results .cmd-item');
+    if (items.length === 0) return;
+    var idx = -1;
+    items.forEach(function(item, i) { if (item.classList.contains('active')) idx = i; });
+    items.forEach(function(item) { item.classList.remove('active'); });
+    idx += dir;
+    if (idx < 0) idx = items.length - 1;
+    if (idx >= items.length) idx = 0;
+    items[idx].classList.add('active');
+    items[idx].scrollIntoView({ block: 'nearest' });
+  }
+
+  // ── Hotkey Help Overlay ──
+  function toggleHotkeyHelp() {
+    var overlay = document.getElementById('hotkey-help');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'hotkey-help';
+      overlay.style.cssText = 'display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:10000;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);';
+      overlay.innerHTML =
+        '<div style="max-width:500px;margin:60px auto;background:var(--surface-solid);border:1px solid var(--border-glass);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.5);padding:24px;max-height:80vh;overflow-y:auto;">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
+            '<div style="font-size:var(--font-size-lg);font-weight:600;color:var(--text-primary);">Keyboard Shortcuts</div>' +
+            '<button class="btn btn-ghost btn-sm" onclick="document.getElementById(\'hotkey-help\').style.display=\'none\'">Close</button>' +
+          '</div>' +
+          '<table style="width:100%;border-collapse:collapse;">' +
+            hotkeyRow('Ctrl + K', 'Command palette (search all views)', true) +
+            hotkeyRow('Ctrl + B', 'Toggle sidebar') +
+            hotkeyRow('Ctrl + Shift + R', 'Refresh current view') +
+            hotkeyRow('Ctrl + `', 'Toggle terminal drawer') +
+            hotkeyRow('Escape', 'Close modal / palette / overlay') +
+            hotkeyRow('?', 'Show this help') +
+            '<tr><td colspan="2" style="padding:12px 0 4px;color:var(--cyan);font-weight:600;font-size:var(--font-size-sm);border-bottom:1px solid var(--border);">Quick Navigation (when not typing)</td></tr>' +
+            hotkeyRow('1', 'Dashboard') +
+            hotkeyRow('2', 'Findings') +
+            hotkeyRow('3', 'Port Scanner') +
+            hotkeyRow('4', 'Web Scanner') +
+            hotkeyRow('5', 'Security Agents') +
+            hotkeyRow('6', 'AI Chat') +
+            hotkeyRow('7', 'Settings') +
+          '</table>' +
+        '</div>';
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) overlay.style.display = 'none';
+      });
+    }
+    overlay.style.display = overlay.style.display === 'none' ? 'block' : 'none';
+  }
+
+  function hotkeyRow(key, desc, isFirst) {
+    var border = isFirst ? '' : 'border-bottom:1px solid rgba(255,255,255,0.04);';
+    return '<tr style="' + border + '">' +
+      '<td style="padding:6px 0;width:150px;"><kbd style="background:var(--well);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--text-primary);">' + key + '</kbd></td>' +
+      '<td style="padding:6px 0;color:var(--text-secondary);font-size:var(--font-size-sm);">' + desc + '</td>' +
+    '</tr>';
+  }
+
+  // Command palette active state CSS
+  var hotkeyStyle = document.createElement('style');
+  hotkeyStyle.textContent = '#cmd-palette-results .cmd-item.active{background:rgba(34,211,238,0.08)} #cmd-palette-results .cmd-item:hover{background:rgba(34,211,238,0.08)}';
+  document.head.appendChild(hotkeyStyle);
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initHotkeys);
+  } else {
+    initHotkeys();
+  }
+
 })();

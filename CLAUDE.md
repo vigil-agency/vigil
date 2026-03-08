@@ -125,7 +125,7 @@ public/
     terminal.css             -> xterm.js terminal
     modal.css                -> Glass modal system
   js/
-    app.js                   -> State, Socket.IO, view registry, nav, cache, animations
+    app.js                   -> State, Socket.IO, view registry, nav, cache, hotkeys, command palette
     charts.js                -> Chart.js wrappers (vulnerability trends, scan history)
     modal.js                 -> Modal.open/close/confirm/loading
     toast.js                 -> Toast notification system
@@ -501,6 +501,36 @@ Route modules receive `ctx` with: `pool`, `dbQuery`, `io`, `execCommand`, `requi
 - Scanner commands are sanitized -- user input is never interpolated into shell commands directly
 - All scan results stored with timestamps for trend analysis
 - Severity levels follow CVSS v3.1 scoring (Critical >= 9.0, High >= 7.0, Medium >= 4.0, Low >= 0.1)
+
+## Keyboard Shortcuts (Browser GUI)
+Implemented in `app.js` via `initHotkeys()`. All shortcuts work in the web browser.
+
+### Global (always active)
+| Key | Action |
+|-----|--------|
+| `Ctrl+K` | Command palette — fuzzy search all 37 views |
+| `Ctrl+B` | Toggle sidebar |
+| `Ctrl+Shift+R` | Refresh current view (re-fetch data) |
+| `Ctrl+`` ` | Toggle terminal drawer |
+| `Escape` | Close modal / palette / overlay |
+| `?` | Keyboard shortcut help overlay |
+
+### Quick Navigation (when no input focused)
+| Key | View |
+|-----|------|
+| `1` | Dashboard |
+| `2` | Findings |
+| `3` | Port Scanner |
+| `4` | Web Scanner |
+| `5` | Security Agents |
+| `6` | AI Chat |
+| `7` | Settings |
+
+### Command Palette
+- Opened with `Ctrl+K`, fuzzy filters `viewNames` object
+- Arrow keys navigate, Enter selects, Escape closes
+- Current view highlighted in cyan
+- `isInputFocused()` gates number key shortcuts (inputs/textareas/selects skip)
 
 ## Testing
 ```bash

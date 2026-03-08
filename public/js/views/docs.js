@@ -24,6 +24,7 @@ Views.docs = {
           '<div class="nav-item doc-nav-item" data-doc="workspace"><span class="nav-item-icon">&#128736;</span><span class="nav-item-label">Workspace &amp; Git</span></div>' +
           '<div class="nav-item doc-nav-item" data-doc="api"><span class="nav-item-icon">&#128268;</span><span class="nav-item-label">API Reference</span></div>' +
           '<div class="nav-item doc-nav-item" data-doc="scanners"><span class="nav-item-icon">&#128187;</span><span class="nav-item-label">Scanner Setup</span></div>' +
+          '<div class="nav-item doc-nav-item" data-doc="shortcuts"><span class="nav-item-icon">&#9000;</span><span class="nav-item-label">Keyboard Shortcuts</span></div>' +
         '</div>' +
 
         '<div class="two-panel-right glass-card" id="docs-content" style="line-height:1.8;color:var(--text-secondary);font-size:var(--font-size-sm);">' +
@@ -835,6 +836,47 @@ Views.docs = {
 
       '<h3 style="color:var(--cyan);margin:16px 0 8px;">Docker (Container Scanning)</h3>' +
       '<div class="code-block" style="margin-bottom:12px;"># Install Docker\ncurl -fsSL https://get.docker.com | sudo sh\n\n# Add user to docker group\nsudo usermod -aG docker $USER\n\n# Verify\ndocker --version</div>' +
-      '<p>Docker is needed for container scanning (trivy image scans) and the Docker security view. Mount the Docker socket in docker-compose.yml or ensure the vigil user has group membership.</p>'
+      '<p>Docker is needed for container scanning (trivy image scans) and the Docker security view. Mount the Docker socket in docker-compose.yml or ensure the vigil user has group membership.</p>',
+
+    'shortcuts':
+      '<h2 style="color:var(--text-primary);font-size:var(--font-size-xl);margin-bottom:16px;">Keyboard Shortcuts</h2>' +
+      '<p style="margin-bottom:16px;">Vigil supports keyboard shortcuts for fast navigation. Press <kbd style="background:var(--well);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);">?</kbd> anywhere in the app to see the full shortcut list.</p>' +
+
+      '<h3 style="color:var(--cyan);margin:16px 0 8px;">Global Shortcuts</h3>' +
+      '<table style="width:100%;border-collapse:collapse;margin-bottom:16px;">' +
+        '<thead><tr style="border-bottom:1px solid var(--border);"><th style="text-align:left;padding:8px 0;color:var(--text-primary);">Key</th><th style="text-align:left;padding:8px 0;color:var(--text-primary);">Action</th></tr></thead>' +
+        '<tbody>' +
+          '<tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:6px 0;"><kbd style="background:var(--well);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:var(--font-size-xs);">Ctrl + K</kbd></td><td style="padding:6px 0;">Open command palette &mdash; fuzzy search across all views</td></tr>' +
+          '<tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:6px 0;"><kbd style="background:var(--well);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:var(--font-size-xs);">Ctrl + B</kbd></td><td style="padding:6px 0;">Toggle sidebar visibility</td></tr>' +
+          '<tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:6px 0;"><kbd style="background:var(--well);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:var(--font-size-xs);">Ctrl + Shift + R</kbd></td><td style="padding:6px 0;">Refresh current view (re-fetch data)</td></tr>' +
+          '<tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:6px 0;"><kbd style="background:var(--well);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:var(--font-size-xs);">Ctrl + `</kbd></td><td style="padding:6px 0;">Toggle terminal drawer</td></tr>' +
+          '<tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:6px 0;"><kbd style="background:var(--well);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:var(--font-size-xs);">Escape</kbd></td><td style="padding:6px 0;">Close modal, command palette, or overlay</td></tr>' +
+          '<tr><td style="padding:6px 0;"><kbd style="background:var(--well);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:var(--font-size-xs);">?</kbd></td><td style="padding:6px 0;">Show keyboard shortcut help overlay</td></tr>' +
+        '</tbody>' +
+      '</table>' +
+
+      '<h3 style="color:var(--cyan);margin:16px 0 8px;">Quick Navigation (number keys)</h3>' +
+      '<p style="margin-bottom:8px;">When no input field is focused, number keys jump directly to common views:</p>' +
+      '<table style="width:100%;border-collapse:collapse;margin-bottom:16px;">' +
+        '<tbody>' +
+          '<tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:6px 0;width:80px;"><kbd style="background:var(--well);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:var(--font-size-xs);">1</kbd></td><td style="padding:6px 0;">Dashboard</td></tr>' +
+          '<tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:6px 0;"><kbd style="background:var(--well);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:var(--font-size-xs);">2</kbd></td><td style="padding:6px 0;">Findings</td></tr>' +
+          '<tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:6px 0;"><kbd style="background:var(--well);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:var(--font-size-xs);">3</kbd></td><td style="padding:6px 0;">Port Scanner</td></tr>' +
+          '<tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:6px 0;"><kbd style="background:var(--well);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:var(--font-size-xs);">4</kbd></td><td style="padding:6px 0;">Web Scanner</td></tr>' +
+          '<tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:6px 0;"><kbd style="background:var(--well);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:var(--font-size-xs);">5</kbd></td><td style="padding:6px 0;">Security Agents</td></tr>' +
+          '<tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:6px 0;"><kbd style="background:var(--well);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:var(--font-size-xs);">6</kbd></td><td style="padding:6px 0;">AI Chat</td></tr>' +
+          '<tr><td style="padding:6px 0;"><kbd style="background:var(--well);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:var(--font-size-xs);">7</kbd></td><td style="padding:6px 0;">Settings</td></tr>' +
+        '</tbody>' +
+      '</table>' +
+
+      '<h3 style="color:var(--cyan);margin:16px 0 8px;">Command Palette</h3>' +
+      '<p style="margin-bottom:8px;">The command palette (<kbd style="background:var(--well);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);">Ctrl+K</kbd>) provides fuzzy search across all 37 views. Type to filter, use arrow keys to navigate, and press Enter to jump to the selected view. The current view is highlighted in cyan.</p>' +
+
+      '<h3 style="color:var(--cyan);margin:16px 0 8px;">Notes</h3>' +
+      '<ul style="padding-left:20px;">' +
+        '<li>Number key shortcuts are disabled when an input field, textarea, or dropdown is focused</li>' +
+        '<li><kbd style="background:var(--well);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);">Ctrl+K</kbd> and <kbd style="background:var(--well);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);">Ctrl+B</kbd> work even when input fields are focused</li>' +
+        '<li>On macOS, <kbd style="background:var(--well);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);">Cmd</kbd> works as an alternative to <kbd style="background:var(--well);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);">Ctrl</kbd></li>' +
+      '</ul>'
   }
 };
