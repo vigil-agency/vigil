@@ -88,6 +88,7 @@ mcp.js                 -> MCP server (Streamable HTTP, 25+ tools, resources, pro
 health.js              -> Health check endpoint, service status
 code-audit.js          -> LLM-driven source code vulnerability scanning (Vulnhuntr-inspired)
 ephemeral-infra.js     -> Disposable proxy node management (fluffy-barnacle-inspired)
+intel-hub.js           -> Intel Hub (RSS feeds, CVE Watch, CISA KEV, AI Briefings)
 ```
 
 ### Lib Modules (~18)
@@ -114,6 +115,7 @@ ephemeral-proxy.js     -> Disposable Codespace proxy management (SOCKS5 tunnels,
 web-recon.js           -> Scrapy-inspired web crawler (surface scan, exposed files, tech fingerprint)
 ghost-osint.js         -> Username enumeration (26 platforms) + phone number intelligence (70+ countries)
 raptor-engine.js       -> Adversarial analysis engine (MUST-GATE reasoning, 4-step exploitability validation)
+intel-feeds.js         -> RSS/Atom feed parser (15 feeds), CISA KEV, NVD CVE API, AI briefings
 ```
 
 ### Frontend (ViewRegistry pattern)
@@ -137,15 +139,20 @@ public/
 
 ## 37 Sidebar Views (ordered by sidebar position)
 
-### AI & Intel (top of sidebar — primary tools)
+### Dashboard + Intel Hub (pinned at top, headerless group)
+| View | File | Description |
+|------|------|-------------|
+| Dashboard | `views/dashboard.js` | Security posture score, active threats, recent scans |
+| Intel Hub | `views/knowledge.js` | RSS feeds, CVE Watch, CISA KEV, AI Briefings (4 tabs) |
+
+### AI & Intel
 | View | File | Description |
 |------|------|-------------|
 | AI Terminal | `views/ai-terminal.js` | Claude CLI terminal for AI-powered security analysis |
 | AI Chat | `views/ai-chat.js` | Conversational AI security assistant |
-| Knowledge Base | `views/knowledge.js` | Security knowledge management |
 | MCP Playground | `views/mcp.js` | MCP tool testing, prompt library, 9 category tabs |
 
-### Agents (second sidebar group)
+### Agents
 | View | File | Description |
 |------|------|-------------|
 | Security Agents | `views/agents.js` | 24 security agents with "Try:" example buttons |
@@ -164,7 +171,6 @@ public/
 ### Threat Operations
 | View | File | Description |
 |------|------|-------------|
-| Dashboard | `views/dashboard.js` | Security posture score, active threats, recent scans |
 | Threat Feed | `views/threat-intel.js` | Threat feeds, IOC matching, adversary profiles |
 | Alert Triage | `views/alerts.js` | Alert rule configuration, notification channels |
 | Threat Hunt | `views/threat-map.js` | Live threat visualization, geographic origins |
