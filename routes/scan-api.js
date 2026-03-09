@@ -1369,3 +1369,6 @@ async function detectWAF(targetUrl, probeMode = 'passive') {
     target: targetUrl,
   };
 }
+
+// Export detectWAF for use by MCP server
+module.exports.detectWAF = detectWAF;

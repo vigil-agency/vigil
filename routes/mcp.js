@@ -350,24 +350,60 @@ module.exports = function (app, ctx) {
       languages: z.array(z.string()).default([]).describe('Languages to scan: javascript, typescript, python, ruby, php, java, go, csharp'),
     }, async ({ target, languages }) => {
       try {
-        const { discoverFiles, VULN_TYPES } = require('../lib/code-audit');
+        const { runCodeAudit, discoverFiles, VULN_TYPES } = require('../lib/code-audit');
         const files = discoverFiles(target, languages);
         if (files.length === 0) return { content: [{ type: 'text', text: 'No source files found in ' + target }] };
 
-        // Start scan via API (background)
-        const http = require('http');
-        const body = JSON.stringify({ target, languages, vulnTypes: Object.keys(VULN_TYPES) });
-        const result = await new Promise((resolve, reject) => {
-          const r = http.request({ hostname: '127.0.0.1', port: process.env.VIGIL_PORT || 4100, path: '/api/code-audit', method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'MCP', Cookie: 'vigil_session=mcp-internal' }
-          }, (resp) => {
-            let d = ''; resp.on('data', c => d += c); resp.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve({ raw: d }); } });
-          });
-          r.on('error', reject); r.setTimeout(10000, () => { r.destroy(); reject(new Error('timeout')); });
-          r.write(body); r.end();
+        if (!ctx.askAIJSON) return { content: [{ type: 'text', text: 'AI provider not configured' }], isError: true };
+
+        // Create scan record
+        const scanId = crypto.randomUUID();
+        const scan = {
+          id: scanId, type: 'code-audit', scanType: 'code-audit', target,
+          options: { languages, vulnTypes: Object.keys(VULN_TYPES) },
+          status: 'running', findings: [], findingsCount: 0,
+          createdAt: new Date().toISOString(), createdBy: 'mcp',
+        };
+        const scansPath = path.join(DATA, 'scans.json');
+        const scans = readJSON(scansPath, []);
+        scans.push(scan);
+        fs.writeFileSync(scansPath, JSON.stringify(scans, null, 2));
+
+        // Run in background — return immediately
+        runCodeAudit(target, {
+          askAIJSON: ctx.askAIJSON,
+          languages,
+          vulnTypes: Object.keys(VULN_TYPES),
+          timeout: 120000,
+          onProgress: (progress) => {
+            if (ctx.io) ctx.io.emit('code_audit_progress', { scanId, phase: progress.phase, message: progress.message });
+          },
+        }).then(result => {
+          scan.findings = result.findings.map(f => ({
+            id: f.id, scanId, type: 'code_vuln', title: `[${f.vulnType}] ${f.title}`,
+            severity: f.severity, details: f.description, file: f.file, line: f.line,
+            cwe: f.cwe, mitre: f.mitre, confidence: f.confidence, vulnType: f.vulnType, status: 'open',
+          }));
+          scan.findingsCount = scan.findings.length;
+          scan.status = 'completed';
+          scan.completedAt = new Date().toISOString();
+          scan.duration = result.duration;
+          scan.summary = result.summary;
+          scan.filesAnalyzed = result.filesAnalyzed;
+          const allScans = readJSON(scansPath, []);
+          const idx = allScans.findIndex(s => s.id === scanId);
+          if (idx >= 0) allScans[idx] = scan;
+          fs.writeFileSync(scansPath, JSON.stringify(allScans, null, 2));
+          if (ctx.io) ctx.io.emit('scan_complete', { id: scanId, type: 'code-audit', status: 'completed', findingsCount: scan.findingsCount });
+        }).catch(e => {
+          scan.status = 'failed'; scan.error = e.message; scan.completedAt = new Date().toISOString();
+          const allScans = readJSON(scansPath, []);
+          const idx = allScans.findIndex(s => s.id === scanId);
+          if (idx >= 0) allScans[idx] = scan;
+          fs.writeFileSync(scansPath, JSON.stringify(allScans, null, 2));
         });
 
-        return { content: [{ type: 'text', text: `Code audit started. ${files.length} files found.\nScan ID: ${result.id || 'N/A'}\nCheck results with get_code_audit_results tool.` }] };
+        return { content: [{ type: 'text', text: `Code audit started. ${files.length} files found.\nScan ID: ${scanId}\nCheck results with get_code_audit_results tool.` }] };
       } catch (e) {
         return { content: [{ type: 'text', text: 'Code audit error: ' + e.message }], isError: true };
       }
@@ -407,17 +443,8 @@ module.exports = function (app, ctx) {
     }, async ({ target, probeMode }) => {
       try {
         if (!/^https?:\/\//i.test(target)) target = 'https://' + target;
-        const http = require('http');
-        const body = JSON.stringify({ target, probeMode });
-        const result = await new Promise((resolve, reject) => {
-          const r = http.request({ hostname: '127.0.0.1', port: process.env.VIGIL_PORT || 4100, path: '/api/scan/waf', method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'MCP', Cookie: 'vigil_session=mcp-internal' }
-          }, (resp) => {
-            let d = ''; resp.on('data', c => d += c); resp.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve({ raw: d }); } });
-          });
-          r.on('error', reject); r.setTimeout(30000, () => { r.destroy(); reject(new Error('timeout')); });
-          r.write(body); r.end();
-        });
+        const { detectWAF } = require('./scan-api');
+        const result = await detectWAF(target, probeMode);
 
         if (result.detected) {
           return { content: [{ type: 'text', text: `WAF Detected: ${result.waf.name} (${result.waf.vendor})\nConfidence: ${result.confidence}%\nEvidence: ${(result.evidence || []).map(e => e.method + ': ' + e.detail).join(', ')}` }] };
@@ -677,9 +704,9 @@ module.exports = function (app, ctx) {
       } else if (method === 'prompts/list') {
         result = await client.listPrompts();
       } else if (method === 'tools/call') {
-        result = await client.callTool(params || {});
+        result = await client.callTool(params || {}, undefined, { timeout: 300000 });
       } else if (method === 'prompts/get') {
-        result = await client.getPrompt({ name: (params || {}).name, arguments: (params || {}).arguments || {} });
+        result = await client.getPrompt({ name: (params || {}).name, arguments: (params || {}).arguments || {} }, undefined, { timeout: 300000 });
       } else if (method === 'resources/read') {
         result = await client.readResource(params || {});
       } else {

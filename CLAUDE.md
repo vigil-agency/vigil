@@ -208,66 +208,48 @@ public/
 - Each customer's MCP server is isolated in their own container sandbox -- tenant-scoped, auth-gated.
 - SDK: `@modelcontextprotocol/sdk` + Zod schemas
 
-### Tools (22)
+### Tools (22) — actual names from routes/mcp.js
 ```
+# System & Posture
+check_posture            -> Security posture score + grade breakdown
+query_logs               -> Natural language log search with AI analysis
+
 # Scanning
-run_nmap_scan            -> Execute nmap scan (ports, hosts, flags)
-run_nuclei_scan          -> Execute nuclei scan (templates, severity filter)
-run_trivy_scan           -> Execute trivy scan (image, filesystem, repo)
-run_nikto_scan           -> Execute nikto web scan (target URL)
-check_ssl_certificate    -> Analyze SSL/TLS certificate chain
-run_dns_recon            -> DNS enumeration + WHOIS lookup
+scan_ports               -> Nmap port scan (target, port range)
+scan_vulnerabilities     -> Nuclei vuln scan (target, severity filter)
+check_ssl                -> SSL/TLS certificate check (domain)
 
-# Vulnerabilities
-search_cve               -> Search CVE database by keyword/product/vendor
-get_vulnerability        -> Get CVE details + CVSS score + references
-list_vulnerabilities     -> List all tracked vulnerabilities (filter by severity)
+# Intelligence & OSINT
+osint_domain             -> Domain DNS reconnaissance (A, MX, NS)
+osint_ip                 -> IP geolocation lookup (ip-api.com)
+triage_alert             -> AI alert triage (title, details, severity)
+hunt_threat              -> Threat hypothesis investigation (Linux evidence)
 
-# Assets
-list_assets              -> List asset inventory with risk scores
-get_asset_details        -> Get asset details + associated vulnerabilities
-discover_hosts           -> Network host discovery (ping sweep)
+# Agents
+run_agent                -> Execute security agent by slug (slug, input)
+launch_campaign          -> Multi-agent campaign (goal, maxAgents)
 
-# Docker
-list_containers          -> List Docker containers with security status
-inspect_container        -> Deep container inspection (config, mounts, network)
-scan_image               -> Trivy scan a Docker image
-
-# Compliance
-check_compliance         -> Run compliance check against framework
-get_policy_status        -> Get security policy enforcement status
+# Compliance & Reports
+generate_report          -> Security report (security-audit/vulnerability/compliance/incident/executive)
+compliance_check         -> Framework compliance check (soc2/iso27001/nist800-53)
+list_findings            -> Get vulnerability findings (severity filter, limit)
 
 # Incidents
-create_incident          -> Create new security incident
-update_incident          -> Update incident status/severity/assignee
-get_incident_timeline    -> Get incident event timeline
-
-# Reports
-generate_report          -> Generate security report (PDF/JSON/CSV)
-get_scan_results         -> Get results from a specific scan
-
-# System
-get_security_posture     -> Overall security posture score + breakdown
-get_system_metrics       -> CPU, memory, disk, network metrics
-get_alert_summary        -> Active alerts summary by severity
+incident_create          -> Create security incident (title, severity, description)
 
 # Code Audit
-run_code_audit           -> Start AI-powered source code vulnerability scan
-get_code_audit_results   -> Get code audit findings (by ID or latest)
+run_code_audit           -> AI source code vulnerability scan (target dir, languages)
+get_code_audit_results   -> Get code audit findings (scanId or "latest")
 
 # WAF Detection
-detect_waf               -> Fingerprint WAF/CDN on a target URL
+detect_waf               -> WAF/CDN fingerprinting (target URL, passive/active)
 
 # Proxy Nodes
 list_proxy_nodes         -> List ephemeral proxy nodes + tunnel status
-create_proxy_node        -> Create disposable Codespace proxy
+create_proxy_node        -> Create disposable Codespace proxy (requires gh auth)
 start_proxy_tunnel       -> Start SOCKS5 tunnel through proxy node
-plan_proxy_infrastructure -> AI-plan proxy infrastructure for engagement
+plan_proxy_infrastructure -> AI proxy infrastructure planning
 ```
-
-### Tool Annotations
-- `readOnlyHint: true` -- safe read operations (list, get, search)
-- `destructiveHint: true` -- operations that modify state (create incident, run destructive scan)
 
 ### Resources
 - `vigil://posture` -- Current security posture overview
@@ -287,8 +269,9 @@ plan_proxy_infrastructure -> AI-plan proxy infrastructure for engagement
 - `anonymous_pentest_setup` -- Plan and provision anonymous scanning infra
 
 ### GUI Test Endpoint
-- `POST /api/mcp/test` uses InMemoryTransport (bypasses HTTP handshake)
-- GUI playground: `/` command bar with fuzzy search, schema-driven param forms, prompt action cards, request log
+- `POST /api/mcp/test` uses InMemoryTransport (bypasses HTTP handshake, 5min tool timeout)
+- GUI playground: search bar + 8 category tabs (All/Scanning/Intelligence/Compliance/Incident/System/Code Audit/Proxy), schema-driven param forms, 4 prompt workflow cards, request log
+- MCP tools that need AI have 120s internal timeout; MCP client timeout is 300s to accommodate
 
 ## ViewRegistry Pattern
 Each view JS file self-registers on `window.Views`:
