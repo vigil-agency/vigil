@@ -468,6 +468,11 @@ Users bring their own AI subscriptions. The app shells out to locally-installed 
 - Lib: `lib/raptor-engine.js` (exports: adversarialAnalysis, validateExploitability, buildAdversarialPrompt, buildExploitabilityPrompt)
 - Agent timeout: 180s (Raptor agents produce 3-14K chars of detailed analysis)
 
+#### How to use Raptor features (3 access points):
+1. **Agents view** (Intelligence > Agents > Hunters tab): Run any of the 5 Raptor agents with natural language input describing your target. Example: paste a code snippet, describe your app architecture, or provide scan output.
+2. **Code Audit view** (Scanning > Code Audit): After running a code audit, expand any finding and click "Validate Exploitability" to run the 4-step MUST-GATE analysis on that specific vulnerability.
+3. **MCP Playground** (System > MCP > Adversarial tab): Test `validate_exploitability` (paste finding details) or `adversarial_analysis` (describe target + context) directly. Also available to any MCP-connected AI assistant.
+
 ### Proxy Nodes (fluffy-barnacle-inspired)
 - GitHub Codespaces as disposable SOCKS5 proxy nodes for anonymous scanning
 - Full lifecycle: create, start, stop, delete Codespaces via `gh` CLI

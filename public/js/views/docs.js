@@ -338,6 +338,8 @@ Views.docs = {
       '<p><strong>Q: What languages are supported?</strong><br>A: JavaScript, TypeScript, Python, Ruby, PHP, Java, Go, and C#. Supports .js, .mjs, .cjs, .ts, .tsx, .py, .rb, .php, .java, .go, .cs extensions.</p>' +
       '<p><strong>Q: How long does a scan take?</strong><br>A: Depends on file count. Preview first to check. Small projects (5-10 files): ~1 minute. Larger projects (30-50 files): 3-5 minutes. Each batch of files requires an AI call (~30-90 seconds).</p>' +
       '<p><strong>Q: Does this require AI to be configured?</strong><br>A: Yes. Code Audit uses the AI provider configured in Settings. It sends source code to the LLM for analysis. Ensure your AI provider is set up and working before running code audits.</p>' +
+      '<p><strong>Q: What is the "Validate Exploitability" button?</strong><br>A: After a code audit completes, each finding has a <strong>Validate Exploitability</strong> button. Clicking it runs the Raptor 4-step MUST-GATE analysis on that specific finding: (1) Source Control &mdash; can an attacker control the input? (2) Sanitizer Effectiveness &mdash; can validation be bypassed? (3) Reachability &mdash; can the code path be triggered? (4) Impact &mdash; what is the worst case? The result shows a verdict badge (EXPLOITABLE in orange, FALSE_POSITIVE in cyan) with pass/fail for each step, attack vector, validated PoC, and reasoning. Takes ~60-90 seconds per finding.</p>' +
+      '<p><strong>Q: How do I use Validate Exploitability?</strong><br>A: (1) Run a code audit on any directory. (2) Wait for results. (3) Click a finding row to expand it. (4) Click the <strong>Validate Exploitability</strong> button (cyan border). (5) Wait ~90s. (6) Review the 4-step validation table and final verdict. Use this to separate real vulnerabilities from false positives before spending time on remediation.</p>' +
 
       /* Proxy Nodes */
       '<h3 style="color:var(--cyan);margin:28px 0 8px;font-size:var(--font-size-lg);">Proxy Nodes (Ephemeral Infrastructure)</h3>' +
@@ -419,7 +421,47 @@ Views.docs = {
         '<li style="margin-bottom:4px;">Campaign runs agents in sequence. Track progress in Active Campaigns panel with progress bar and agent completion count.</li>' +
         '<li style="margin-bottom:4px;">Click <strong>View Details</strong> to see each agent\'s status and summary in a modal.</li>' +
       '</ol>' +
-      '<p><strong>Q: How does Vigil choose which agents to run?</strong><br>A: AI selects the most relevant agents based on your goal description and available agent capabilities. A "security assessment" might use Port Scanner + HTTP Header Auditor + TLS Analyzer.</p>',
+      '<p><strong>Q: How does Vigil choose which agents to run?</strong><br>A: AI selects the most relevant agents based on your goal description and available agent capabilities. A "security assessment" might use Port Scanner + HTTP Header Auditor + TLS Analyzer.</p>' +
+
+      /* Raptor Adversarial Agents */
+      '<h3 style="color:var(--cyan);margin:28px 0 8px;font-size:var(--font-size-lg);">Raptor Adversarial Agents</h3>' +
+      '<p>5 specialized agents powered by MUST-GATE adversarial reasoning. They think like attackers: assume everything is exploitable, trace full data flows, provide concrete proof-of-concepts, and never hedge without verification. These produce 3-14K chars of detailed professional-grade analysis.</p>' +
+
+      '<table class="data-table" style="font-size:var(--font-size-xs);"><thead><tr><th>Agent</th><th>Category</th><th>What It Does</th><th>Takes ~</th></tr></thead><tbody>' +
+        '<tr><td style="color:var(--text-primary);">Adversarial Analyst</td><td>Hunter</td><td>Full MUST-GATE adversarial analysis &mdash; assumes exploitability, traces attack paths, CWE-mapped findings with PoC</td><td>2-3 min</td></tr>' +
+        '<tr><td style="color:var(--text-primary);">Exploit Validator</td><td>Hunter</td><td>4-step validation of a specific finding: Source Control &rarr; Sanitizer &rarr; Reachability &rarr; Impact. Verdict: EXPLOITABLE / FALSE_POSITIVE</td><td>30-60s</td></tr>' +
+        '<tr><td style="color:var(--text-primary);">Attack Path Mapper</td><td>Hunter</td><td>Maps entry points &rarr; intermediate nodes &rarr; target assets. Produces ranked attack chains with prerequisites</td><td>1-2 min</td></tr>' +
+        '<tr><td style="color:var(--text-primary);">Patch Reviewer</td><td>Defender</td><td>Reviews security patches from attacker perspective &mdash; finds bypasses, edge cases, incomplete fixes. Verdict: COMPLETE / PARTIAL / INEFFECTIVE</td><td>30-60s</td></tr>' +
+        '<tr><td style="color:var(--text-primary);">Red Team Planner</td><td>Hunter</td><td>Multi-phase engagement plan mapped to MITRE ATT&amp;CK: Recon &rarr; Initial Access &rarr; Persistence &rarr; Exfil. OPSEC + contingency plans</td><td>1-2 min</td></tr>' +
+      '</tbody></table>' +
+
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">How to use:</p>' +
+      '<ol style="padding-left:20px;list-style:decimal;">' +
+        '<li style="margin-bottom:4px;">Go to <strong>Intelligence &gt; Agents</strong></li>' +
+        '<li style="margin-bottom:4px;">Click the <strong>Hunters</strong> tab to find the 5 Raptor agents</li>' +
+        '<li style="margin-bottom:4px;">Click <strong>Run Agent</strong> on any Raptor agent</li>' +
+        '<li style="margin-bottom:4px;">Enter your target description in natural language</li>' +
+        '<li style="margin-bottom:4px;">Wait 30s-3min for analysis. Output appears with cyan border on success.</li>' +
+      '</ol>' +
+
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">Example inputs for each agent:</p>' +
+      '<div class="code-block" style="margin-bottom:8px;font-size:11px;">' +
+        'Adversarial Analyst:\n' +
+        '  "Express.js app with cookie-based auth, JSON file storage,\n   and shell command execution for security scanning"\n\n' +
+        'Exploit Validator:\n' +
+        '  "XSS in search results: user input from ?q= parameter is\n   reflected in HTML without encoding"\n\n' +
+        'Attack Path Mapper:\n' +
+        '  "Web app with: login page, REST API, Socket.IO, embedded\n   terminal, AI CLI integration, credential vault"\n\n' +
+        'Patch Reviewer:\n' +
+        '  "Fix: replaced execCommand(cmd) with execFileSafe(bin, args).\n   Before: execCommand(\\"nmap \\" + target).\n   After: execFileSafe(\\"nmap\\", [\\"-sV\\", target])"\n\n' +
+        'Red Team Planner:\n' +
+        '  "Internal web app with Express.js backend, cookie auth,\n   and security scanning capabilities. Internal network only."' +
+      '</div>' +
+
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">FAQ:</p>' +
+      '<p><strong>Q: What is MUST-GATE?</strong><br>A: 7 forced reasoning constraints that prevent the AI from cutting corners. ASSUME-EXPLOIT (assume exploitable until proven otherwise), NO-HEDGING (verify every "maybe"), FULL-COVERAGE (trace entire data flow), PROOF (concrete PoC required), STRICT-SEQUENCE (follow steps in order), CHECKLIST (pass/fail each check), CONSISTENCY (verdict must match evidence).</p>' +
+      '<p><strong>Q: How is this different from regular agents?</strong><br>A: Regular agents give general security analysis. Raptor agents use adversarial thinking patterns &mdash; they assume the worst, trace full attack paths source-to-sink, provide concrete proof-of-concepts, and give definitive verdicts instead of vague warnings. The output is suitable for professional pentest reports.</p>' +
+      '<p><strong>Q: Why do Raptor agents take longer?</strong><br>A: They produce 3-14K chars of structured analysis with code references, CWE IDs, MITRE ATT&amp;CK mappings, PoC exploits, and step-by-step validation. The 180-second timeout accommodates this depth. Simpler agents return in 10-30 seconds.</p>',
 
 
     /* ===== INCIDENTS & PLAYBOOKS ===== */
@@ -659,7 +701,12 @@ Views.docs = {
       '<div class="code-block" style="margin-bottom:8px;"># Claude Code\nclaude mcp add vigil --transport http http://localhost:4100/mcp\n\n# Claude Desktop config:\n{ "mcpServers": { "vigil": { "url": "http://localhost:4100/mcp" } } }\n\n# cURL test:\ncurl -X POST http://localhost:4100/mcp -H "Content-Type: application/json" \\\n  -d \'{"jsonrpc":"2.0","method":"tools/list","id":1}\'</div>' +
       '<p><strong>Q: What is MCP?</strong><br>A: Model Context Protocol is a standard for AI assistants to interact with external tools. Vigil exposes 24 security tools, 6 live resources, and 7 prompt workflows via MCP. Claude (or any MCP-compatible AI) can run scans, check posture, triage alerts, hunt threats, audit code, detect WAFs, manage proxy infrastructure, validate exploitability, run adversarial analysis, and generate reports.</p>' +
       '<p><strong>Q: Why do some MCP tools take a while?</strong><br>A: AI-powered tools (triage_alert, hunt_threat, generate_report, compliance_check, run_agent, launch_campaign, plan_proxy_infrastructure, validate_exploitability, adversarial_analysis) use the configured AI provider and may take 15-120 seconds. Scanner tools (scan_ports, scan_vulnerabilities) depend on scan complexity. The MCP test endpoint supports up to 5 minute timeouts.</p>' +
-      '<p><strong>Q: Why does create_proxy_node fail?</strong><br>A: It requires the GitHub CLI (gh) to be authenticated with an account that has Codespaces access. Run <code>gh auth login</code> inside the container to configure.</p>',
+      '<p><strong>Q: Why does create_proxy_node fail?</strong><br>A: It requires the GitHub CLI (gh) to be authenticated with an account that has Codespaces access. Run <code>gh auth login</code> inside the container to configure.</p>' +
+      '<p><strong>Q: How do I use the Adversarial MCP tools?</strong><br>A: Two Raptor-powered tools are in the <strong>Adversarial</strong> category tab:<br>' +
+        '&bull; <strong>validate_exploitability</strong> &mdash; Paste a finding title, details, severity, and vuln type. Returns a 4-step MUST-GATE validation with verdict (EXPLOITABLE/FALSE_POSITIVE/NEEDS_INVESTIGATION). ~90 seconds.<br>' +
+        '&bull; <strong>adversarial_analysis</strong> &mdash; Describe any target (app architecture, code snippet, URL, scan results). Returns adversarial findings with CWE IDs, attack paths, PoCs, and risk rating. ~2-5 minutes.<br>' +
+        'Both work from the MCP Playground GUI (click Adversarial tab, select tool, fill params, click Execute) or via any MCP-connected AI assistant (Claude Desktop, Claude Code, etc.).</p>' +
+      '<p><strong>Q: Can I use these tools from Claude Desktop?</strong><br>A: Yes. Connect Claude to Vigil via MCP: <code>claude mcp add vigil --transport http http://localhost:4100/mcp</code>. Then ask Claude things like "validate whether this SQL injection finding is exploitable" or "run an adversarial analysis on this Express.js API." Claude will call the Raptor tools automatically.</p>',
 
 
     /* ===== SETTINGS & SYSTEM ===== */
