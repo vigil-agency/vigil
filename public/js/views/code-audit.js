@@ -546,7 +546,7 @@ Views['code-audit'] = {
 
     if (detail) detail.textContent = data.message || '';
 
-    var phaseProgress = { identify: 10, strings: 30, structure: 50, ai: 70, complete: 100 };
+    var phaseProgress = { identify: 10, strings: 25, structure: 40, deep: 55, ai: 75, complete: 100 };
     var pct = phaseProgress[data.phase] || 50;
     if (bar) bar.style.width = pct + '%';
 
@@ -554,6 +554,7 @@ Views['code-audit'] = {
       identify: 'Identifying file type...',
       strings: 'Extracting strings & IOCs...',
       structure: 'Analyzing binary structure...',
+      deep: 'Deep analysis (entropy, disasm, taint chains)...',
       ai: 'Running AI threat assessment...',
       complete: 'Analysis complete'
     };
@@ -602,10 +603,14 @@ Views['code-audit'] = {
     // Stats
     var riskCount = (r.riskIndicators || []).length;
     var iocCount = (iocs.urls || []).length + (iocs.ips || []).length + (iocs.emails || []).length + (iocs.domains || []).length;
+    var mitreCount = (r.mitreTactics || []).length;
+    var chainCount = (r.taintChains || []).length;
     var html =
       '<div class="stat-grid" style="margin-bottom:16px;">' +
         '<div class="stat-card"><div class="stat-card-label">Risk Indicators</div><div class="stat-card-value" style="color:' + (riskCount > 0 ? 'var(--orange)' : 'var(--cyan)') + ';">' + riskCount + '</div></div>' +
         '<div class="stat-card"><div class="stat-card-label">IOCs Found</div><div class="stat-card-value" style="color:' + (iocCount > 0 ? 'var(--orange)' : 'var(--cyan)') + ';">' + iocCount + '</div></div>' +
+        '<div class="stat-card"><div class="stat-card-label">ATT&amp;CK Techniques</div><div class="stat-card-value" style="color:' + (mitreCount > 0 ? 'var(--orange)' : 'var(--cyan)') + ';">' + mitreCount + '</div></div>' +
+        '<div class="stat-card"><div class="stat-card-label">Taint Chains</div><div class="stat-card-value" style="color:' + (chainCount > 0 ? 'var(--orange)' : 'var(--cyan)') + ';">' + chainCount + '</div></div>' +
         '<div class="stat-card"><div class="stat-card-label">Strings</div><div class="stat-card-value">' + (str.total || 0) + '</div></div>' +
         '<div class="stat-card"><div class="stat-card-label">Duration</div><div class="stat-card-value">' + duration + '</div></div>' +
       '</div>';
@@ -713,8 +718,27 @@ Views['code-audit'] = {
       html += '</div>';
     }
 
-    // Sections
-    if (struct.sections && struct.sections.length) {
+    // Section Entropy Heatmap (vibe-re)
+    if (r.sectionEntropy && r.sectionEntropy.length) {
+      html += '<div class="glass-card" style="margin-bottom:16px;">' +
+        '<div class="glass-card-header"><div class="glass-card-title">Section Entropy Heatmap</div>' +
+          (r.packers && r.packers.length ? '<div style="display:flex;gap:6px;">' + r.packers.map(function(p) { return '<span class="badge badge-orange">' + escapeHtml(p.name) + '</span>'; }).join('') + '</div>' : '') +
+        '</div>' +
+        '<table class="data-table"><thead><tr><th>Section</th><th>Size</th><th>Entropy</th><th style="width:200px;">Heatmap</th><th>Assessment</th></tr></thead><tbody>';
+      r.sectionEntropy.forEach(function(se) {
+        var pct = Math.round((se.entropy / 8) * 100);
+        var barColor = se.entropy > 7.5 ? 'var(--orange)' : se.entropy > 7.0 ? '#e67e22' : se.entropy > 6.0 ? 'var(--cyan)' : 'var(--text-tertiary)';
+        var rowStyle = se.anomaly ? 'background:rgba(255,107,43,0.08);' : '';
+        html += '<tr style="' + rowStyle + '">' +
+          '<td style="font-family:var(--font-mono);color:' + (se.executable ? 'var(--cyan)' : 'var(--text-secondary)') + ';">' + escapeHtml(se.name) + '</td>' +
+          '<td>' + (se.size || 0).toLocaleString() + '</td>' +
+          '<td style="font-family:var(--font-mono);color:' + barColor + ';">' + se.entropy + '</td>' +
+          '<td><div style="background:var(--well);border-radius:4px;height:16px;overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:' + barColor + ';border-radius:4px;transition:width .3s;"></div></div></td>' +
+          '<td style="font-size:11px;color:' + (se.anomaly ? 'var(--orange)' : 'var(--text-tertiary)') + ';">' + escapeHtml(se.anomaly || se.assessment) + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+    } else if (struct.sections && struct.sections.length) {
+      // Fallback: basic sections table
       html += '<div class="glass-card" style="margin-bottom:16px;">' +
         '<div class="glass-card-header"><div class="glass-card-title">Sections (' + struct.sections.length + ')</div></div>' +
         '<table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Address</th><th>Size</th></tr></thead><tbody>';
@@ -725,6 +749,80 @@ Views['code-audit'] = {
           '<td>' + (sec.size || 0).toLocaleString() + '</td></tr>';
       });
       html += '</tbody></table></div>';
+    }
+
+    // MITRE ATT&CK Mapping (vibe-re)
+    if (r.mitreTactics && r.mitreTactics.length) {
+      html += '<div class="glass-card" style="margin-bottom:16px;">' +
+        '<div class="glass-card-header"><div class="glass-card-title" style="color:var(--cyan);">MITRE ATT&amp;CK Mapping (' + r.mitreTactics.length + ' techniques)</div></div>' +
+        '<table class="data-table"><thead><tr><th>Technique</th><th>Tactic</th><th>Name</th><th>Evidence</th></tr></thead><tbody>';
+      r.mitreTactics.forEach(function(t) {
+        html += '<tr><td style="font-family:var(--font-mono);color:var(--orange);font-weight:600;">' + escapeHtml(t.tid) + '</td>' +
+          '<td style="color:var(--text-secondary);font-size:11px;">' + escapeHtml(t.tactic) + '</td>' +
+          '<td style="color:var(--text-primary);">' + escapeHtml(t.name) + '</td>' +
+          '<td style="font-size:11px;color:var(--text-tertiary);">' + t.evidence.slice(0, 3).map(function(e) { return escapeHtml(e); }).join(', ') + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+
+    // Import Taint Chains (vibe-re)
+    if (r.taintChains && r.taintChains.length) {
+      html += '<div class="glass-card" style="margin-bottom:16px;">' +
+        '<div class="glass-card-header"><div class="glass-card-title" style="color:var(--orange);">Import Taint Chains (' + r.taintChains.length + ')</div></div>';
+      r.taintChains.forEach(function(chain) {
+        html += '<div style="padding:10px 0;border-bottom:1px solid var(--border);">' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">' +
+            '<span class="badge ' + severityBadge(chain.severity) + '">' + escapeHtml(chain.severity) + '</span>' +
+            '<span style="color:var(--text-primary);font-weight:600;">' + escapeHtml(chain.name) + '</span>' +
+            '<span style="color:var(--text-tertiary);font-size:11px;">(' + chain.matchRatio + ' imports, confidence: ' + chain.confidence + ')</span>' +
+          '</div>' +
+          '<div style="color:var(--text-tertiary);font-size:var(--font-size-sm);margin-bottom:4px;">' + escapeHtml(chain.description) + '</div>' +
+          '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">';
+        chain.matchedImports.forEach(function(imp, idx) {
+          if (idx > 0) html += '<span style="color:var(--text-tertiary);font-size:10px;">&#x2192;</span>';
+          html += '<span class="tag" style="color:var(--orange);border-color:var(--orange);font-family:var(--font-mono);font-size:11px;">' + escapeHtml(imp) + '</span>';
+        });
+        html += '</div></div>';
+      });
+      html += '</div>';
+    }
+
+    // Disassembly Patterns (vibe-re)
+    if (r.disasmPatterns && r.disasmPatterns.length) {
+      html += '<div class="glass-card" style="margin-bottom:16px;">' +
+        '<div class="glass-card-header"><div class="glass-card-title" style="color:var(--orange);">Disassembly Patterns (' + r.disasmPatterns.length + ')</div></div>';
+      r.disasmPatterns.forEach(function(pat) {
+        html += '<div style="padding:8px 0;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;">' +
+          '<span class="badge ' + severityBadge(pat.severity) + '" style="flex-shrink:0;">' + escapeHtml(pat.severity) + '</span>' +
+          '<div><div style="display:flex;align-items:center;gap:8px;">' +
+            '<span style="color:var(--text-primary);font-weight:500;font-size:var(--font-size-sm);">' + escapeHtml(pat.name) + '</span>' +
+            '<span class="tag" style="font-size:10px;">' + escapeHtml(pat.category) + '</span>' +
+            '<span style="color:var(--text-tertiary);font-size:11px;">' + pat.count + 'x</span>' +
+          '</div>' +
+          '<div style="color:var(--text-tertiary);font-size:11px;margin-top:2px;">' + escapeHtml(pat.description) + '</div></div></div>';
+      });
+      html += '</div>';
+    }
+
+    // String Obfuscation (vibe-re)
+    if (r.obfuscation && r.obfuscation.techniques.length) {
+      var obfColor = r.obfuscation.obfuscationScore > 60 ? 'var(--orange)' : r.obfuscation.obfuscationScore > 30 ? '#e67e22' : 'var(--text-secondary)';
+      html += '<div class="glass-card" style="margin-bottom:16px;">' +
+        '<div class="glass-card-header"><div class="glass-card-title">String Obfuscation Analysis</div>' +
+          '<div style="color:' + obfColor + ';font-weight:600;font-size:var(--font-size-lg);">' + r.obfuscation.obfuscationScore + '/100</div></div>' +
+        '<div style="margin-bottom:8px;"><div style="background:var(--well);border-radius:4px;height:8px;overflow:hidden;"><div style="width:' + r.obfuscation.obfuscationScore + '%;height:100%;background:' + obfColor + ';border-radius:4px;"></div></div></div>' +
+        '<div style="display:flex;gap:16px;margin-bottom:12px;font-size:11px;color:var(--text-tertiary);">' +
+          '<span>Plaintext Ratio: ' + (r.obfuscation.stats.plaintextRatio || 0) + '%</span>' +
+          '<span>High-Entropy Blocks: ' + (r.obfuscation.stats.suspiciousBlocks || 0) + '</span>' +
+          '<span>Total Strings: ' + (r.obfuscation.stats.totalStrings || 0) + '</span>' +
+        '</div>';
+      r.obfuscation.techniques.forEach(function(tech) {
+        html += '<div style="padding:6px 0;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:8px;">' +
+          '<span class="badge ' + severityBadge(tech.severity) + '" style="flex-shrink:0;">' + escapeHtml(tech.severity) + '</span>' +
+          '<div><div style="color:var(--text-primary);font-weight:500;font-size:var(--font-size-sm);">' + escapeHtml(tech.name) + '</div>' +
+          '<div style="color:var(--text-tertiary);font-size:11px;">' + escapeHtml(tech.detail) + '</div></div></div>';
+      });
+      html += '</div>';
     }
 
     // Interesting strings

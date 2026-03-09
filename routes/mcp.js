@@ -689,22 +689,31 @@ module.exports = function (app, ctx) {
       }
     });
 
-    // 29. analyze_binary
-    server.tool('analyze_binary', 'Analyze a binary file for malware indicators and security concerns', {
+    // 29. analyze_binary (enhanced with vibe-re deep analysis)
+    server.tool('analyze_binary', 'Analyze a binary file for malware indicators — includes deep analysis (section entropy, disassembly patterns, import taint chains, MITRE ATT&CK mapping, string obfuscation detection)', {
       filePath: z.string().describe('Path to binary file to analyze'),
       aiAnalysis: z.boolean().default(true).describe('Include AI threat assessment'),
-    }, async ({ filePath, aiAnalysis }) => {
+      deepAnalysis: z.boolean().default(true).describe('Include vibe-re deep analysis (section entropy, disasm patterns, taint chains, MITRE mapping)'),
+    }, async ({ filePath, aiAnalysis, deepAnalysis }) => {
       try {
         const { analyzeBinary } = require('../lib/binary-analysis');
         const result = await analyzeBinary(filePath, {
           askAI: aiAnalysis ? ctx.askAI : null,
+          deepAnalysis,
           timeout: 120000,
         });
         return { content: [{ type: 'text', text: JSON.stringify({
-          fileName: result.fileName, fileType: result.fileType, size: result.size,
+          fileName: result.file, fileType: result.fileType, size: result.size,
           hashes: result.hashes, entropy: result.entropy,
           suspiciousImports: (result.suspiciousImports || []).length,
-          iocs: result.iocs, aiAnalysis: result.aiAnalysis ? result.aiAnalysis.substring(0, 2000) : null,
+          iocs: result.iocs,
+          packers: result.packers || [],
+          taintChains: (result.taintChains || []).map(c => ({ name: c.name, severity: c.severity, imports: c.matchedImports })),
+          mitreTactics: (result.mitreTactics || []).map(t => ({ tid: t.tid, tactic: t.tactic, name: t.name })),
+          disasmPatterns: (result.disasmPatterns || []).map(p => ({ name: p.name, severity: p.severity, count: p.count })),
+          obfuscationScore: result.obfuscation ? result.obfuscation.obfuscationScore : 0,
+          riskIndicators: (result.riskIndicators || []).length,
+          aiAssessment: result.aiAssessment ? result.aiAssessment.substring(0, 2000) : null,
         }, null, 2) }] };
       } catch (e) {
         return { content: [{ type: 'text', text: 'Binary analysis error: ' + e.message }], isError: true };

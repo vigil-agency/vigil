@@ -117,7 +117,7 @@ web-recon.js           -> Scrapy-inspired web crawler (surface scan, exposed fil
 osint-engine.js        -> OSINT reconnaissance engine (domain/IP/WHOIS/DNS, reverse IP, reputation, WHOIS history, cert transparency)
 ghost-osint.js         -> Username enumeration (26 platforms) + phone number intelligence (70+ countries)
 raptor-engine.js       -> Adversarial analysis engine (MUST-GATE reasoning, 4-step exploitability validation)
-binary-analysis.js     -> Lightweight binary inspection (file, strings, readelf, objdump) + AI threat assessment
+binary-analysis.js     -> Binary deep analysis (vibe-re): section entropy, disasm patterns, taint chains, MITRE mapping, obfuscation detection + AI
 pentest-commands.js    -> Parameterized command catalog (18 commands, 4 templates) + execution engine
 purple-team.js         -> MITRE ATT&CK kill chain simulator (14 tactics, 5 scenarios, gap analysis)
 ai-security-kb.js      -> AI Security Knowledge Base (OWASP LLM Top 10, MITRE ATLAS, injection patterns, defensive tools)
@@ -284,8 +284,8 @@ get_pentest_results      -> Get pentest project details and findings (projectId 
 run_purple_team_sim      -> Run attack-defense gap analysis simulation (target, scenario)
 get_purple_team_results  -> Get purple team simulation results (simId or "latest")
 
-# Binary Analysis
-analyze_binary           -> Analyze binary file for malware indicators (filePath, aiAnalysis)
+# Binary Analysis (vibe-re enhanced)
+analyze_binary           -> Deep binary analysis + MITRE mapping (filePath, aiAnalysis, deepAnalysis)
 
 # SSH Tunnels & Callback (pgrok-inspired)
 create_tunnel            -> Create SSH tunnel (forward/reverse/dynamic, sshTarget, ports)
@@ -534,16 +534,23 @@ Users bring their own AI subscriptions. The app shells out to locally-installed 
 - Socket.IO events: `pentest_progress`, `pentest_exec_complete`
 - Lib: `lib/pentest-commands.js`, Routes: `routes/pentest.js` (standalone, moved from extras.js)
 
-### Binary Analysis (integrated in Code Audit view)
-- Lightweight binary inspection using `file`, `strings`, `readelf`, `objdump` (no Ghidra/Java)
+### Binary Analysis (integrated in Code Audit view, vibe-re enhanced)
+- Binary inspection using `file`, `strings`, `readelf`, `objdump` (no Ghidra/Java)
 - Extracts: file type, hashes (MD5/SHA1/SHA256), Shannon entropy, IOCs (URLs, IPs, emails, domains, CVEs)
 - 60+ suspicious import detection (process injection, anti-debug, crypto, persistence, network APIs)
 - ELF/PE structure: section headers, dynamic symbols, shared libraries, imports/exports
-- AI threat assessment: LLM produces malware analysis report with MITRE ATT&CK mapping
+- Deep analysis (vibe-re inspired, 0xeb/vibe-re):
+  - Per-section entropy heatmap with anomaly detection (encrypted data, code caves, packed sections)
+  - 15 packer signatures: UPX, ASPack, VMProtect, Themida, Enigma, PECompact, MPRESS, Petite, NSPack, MEW
+  - 9 disassembly patterns via objdump: ROP gadgets, syscalls, NOP sleds, PEB access, XOR decoders, call-pop PIC, stack pivots, self-modifying code, anti-disassembly
+  - 12 import taint chains: process injection, process hollowing, reflective DLL, network exfiltration, HTTP C2, download & execute, credential harvesting, keylogger, anti-analysis, persistence, Unix reverse shell, shared library injection
+  - MITRE ATT&CK mapping: auto-maps imports + IOCs + strings to ATT&CK techniques (70+ mappings)
+  - String obfuscation detection: chi-squared distribution, XOR key brute-force, encrypted block detection, string density analysis (score 0-100)
+- AI threat assessment: LLM produces malware analysis report with deep analysis context
 - Max file size: 50MB
 - API: `POST /api/code-audit/binary`, `GET /api/code-audit/binary/:id`
 - Frontend: "Binary Analysis" tab in Code Audit view, results in Findings view (type='binary-analysis')
-- Lib: `lib/binary-analysis.js` (exports: analyzeBinary, detectFileType, extractStrings, analyzeELF, analyzePE, computeEntropy, computeHashes, flagSuspiciousImports)
+- Lib: `lib/binary-analysis.js` (exports: analyzeBinary, detectFileType, extractStrings, analyzeELF, analyzePE, computeEntropy, computeHashes, flagSuspiciousImports, analyzeEntropySections, detectDisassemblyPatterns, buildImportTaintChains, mapMITREAttackTactics, detectStringObfuscation)
 
 ### Raptor Engine (Adversarial Analysis)
 - MUST-GATE reasoning framework: 7 forced constraints (ASSUME-EXPLOIT, STRICT-SEQUENCE, CHECKLIST, NO-HEDGING, FULL-COVERAGE, PROOF, CONSISTENCY)
