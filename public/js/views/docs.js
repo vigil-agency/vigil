@@ -567,29 +567,37 @@ Views.docs = {
       '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">History Tab:</p>' +
       '<p>Last 100 lookups (domain + IP) with type, target, summary, and timestamp. Click any entry to re-run the investigation.</p>' +
 
-      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">Web Recon Tab (Scrapy-inspired):</p>' +
-      '<p>Lightweight web crawler for security reconnaissance. Three spider types:</p>' +
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">Web Recon Tab (Scrapy + Scrapling inspired):</p>' +
+      '<p>Lightweight web crawler for security reconnaissance with stealth capabilities. Four spider types:</p>' +
       '<ul style="padding-left:20px;list-style:disc;">' +
-        '<li><strong>Surface Scan</strong> &mdash; Crawl pages up to configurable depth, extract links (internal/external), emails, forms (login/file upload detection), technology stack, and security headers. Respects robots.txt.</li>' +
+        '<li><strong>Surface Scan</strong> &mdash; Crawl pages up to configurable depth, extract links (internal/external), emails, forms (login/file upload detection), technology stack, security headers, and IOCs (IP addresses, hashes, CVEs). Respects robots.txt.</li>' +
         '<li><strong>Exposed Files</strong> &mdash; Probe 50+ sensitive paths (.env, .git/config, backup.zip, wp-config.php, phpinfo.php, etc.) with risk assessment (critical/high/medium/low). Detects both exposed (200) and forbidden (403) paths.</li>' +
-        '<li><strong>Tech Fingerprint</strong> &mdash; Deep technology detection from HTTP headers (Server, X-Powered-By, CDN), HTML patterns (CMS, JS frameworks), and known paths (WordPress, Joomla, security.txt). Identifies 20+ technologies.</li>' +
+        '<li><strong>Tech Fingerprint</strong> &mdash; Deep technology detection from HTTP headers (Server, X-Powered-By, CDN), HTML patterns (CMS, JS frameworks), and known paths (WordPress, Joomla, security.txt). Identifies 20+ technologies + extracts IOCs.</li>' +
+        '<li><strong>Threat Intel</strong> &mdash; Scrape 6 public threat intelligence feeds (CISA KEV, Feodo Tracker, URLhaus, ThreatFox, OpenPhish, IPsum). Extracts IOCs (IPs, MD5 hashes, CVEs) from all feeds. No API keys required.</li>' +
       '</ul>' +
-      '<p>Results include stat cards (pages scanned, emails found, technologies detected, exposed paths, header score), technology badges, security header analysis (present/missing), exposed path table with risk levels, form detection, and AI analysis button for a pentest-grade security assessment.</p>' +
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">Stealth Mode (Scrapling-inspired):</p>' +
+      '<p>Enable the <strong>Stealth</strong> checkbox to activate anti-detection features: realistic browser User-Agent rotation (Chrome/Firefox/Safari profiles), Sec-Fetch headers, sec-ch-ua client hints, Google referer injection on first request, and randomized timing jitter (&plusmn;30% delay). Inspired by D4Vinci\'s Scrapling library and Apify\'s header-generator.</p>' +
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">IOC Extraction:</p>' +
+      '<p>Surface and fingerprint scans automatically extract Indicators of Compromise from crawled pages: IPv4 addresses (excluding private ranges), MD5 and SHA256 hashes, and CVE identifiers. Threat Intel spider extracts IOCs from all feed data. IOC counts are shown in the results stat cards and listed in a dedicated section.</p>' +
+      '<p>Results include stat cards (pages, emails, technologies, exposed paths, header score, IOCs, duration), technology badges, security header analysis, exposed path table, form detection, IOC listing, and AI analysis button.</p>' +
 
-      '<p><strong>Q: Does OSINT make external API calls?</strong><br>A: Domain recon uses TLS connections (for SSL cert) and HTTP requests (for headers/technologies). IP lookup uses ip-api.com for geolocation. Web Recon crawls the target directly. No paid APIs required.</p>' +
-      '<p><strong>Q: What does Web Recon crawl?</strong><br>A: Only the target domain (internal links). External links are counted but not followed. Rate-limited to 500ms between requests by default. Respects robots.txt. Max 30 pages per scan.</p>' +
+      '<p><strong>Q: Does OSINT make external API calls?</strong><br>A: Domain recon uses TLS connections (for SSL cert) and HTTP requests (for headers/technologies). IP lookup uses ip-api.com for geolocation. Web Recon crawls the target directly. Threat Intel fetches public feeds (CISA, abuse.ch, OpenPhish, IPsum). No paid APIs required.</p>' +
+      '<p><strong>Q: What does Web Recon crawl?</strong><br>A: Only the target domain (internal links). External links are counted but not followed. Rate-limited to 500ms between requests by default (with jitter in stealth mode). Respects robots.txt. Max 30 pages per scan.</p>' +
+      '<p><strong>Q: What threat intel feeds are scraped?</strong><br>A: CISA Known Exploited Vulnerabilities (JSON), Feodo Tracker botnet C2 IPs, URLhaus malware URLs, ThreatFox malware MD5s, OpenPhish phishing URLs, and IPsum threat IP aggregator. All public, no API keys needed.</p>' +
 
       '<p style="color:var(--text-primary);font-weight:600;margin:16px 0 4px;">How to use Web Recon:</p>' +
       '<ol style="padding-left:20px;line-height:2;">' +
         '<li>Go to <strong>OSINT</strong> in the sidebar, click the <strong>Web Recon</strong> tab.</li>' +
-        '<li>Enter a target URL (e.g. <code style="background:var(--well);padding:1px 4px;border-radius:3px;">https://example.com</code>).</li>' +
+        '<li>Enter a target URL (e.g. <code style="background:var(--well);padding:1px 4px;border-radius:3px;">https://example.com</code>). For Threat Intel, no URL needed.</li>' +
         '<li>Select a <strong>Spider Type</strong>:<br>' +
-          '&bull; <em>Surface Scan</em> &mdash; crawl pages, find emails, tech stack, forms, security headers.<br>' +
+          '&bull; <em>Surface Scan</em> &mdash; crawl pages, find emails, tech stack, forms, security headers, IOCs.<br>' +
           '&bull; <em>Exposed Files</em> &mdash; check 50+ sensitive paths (.env, .git, backups, configs).<br>' +
-          '&bull; <em>Tech Fingerprint</em> &mdash; identify server, CMS, JS frameworks, CDN from headers and HTML.</li>' +
-        '<li>Set <strong>Depth</strong> (1-3). Higher depth follows more internal links but takes longer.</li>' +
+          '&bull; <em>Tech Fingerprint</em> &mdash; identify server, CMS, JS frameworks, CDN + extract IOCs.<br>' +
+          '&bull; <em>Threat Intel</em> &mdash; scrape public feeds (CISA KEV, abuse.ch, OpenPhish, IPsum).</li>' +
+        '<li>Optionally enable <strong>Stealth</strong> mode for anti-detection (browser-like headers, timing jitter).</li>' +
+        '<li>Set <strong>Depth</strong> (1-3) for surface scans. Higher depth follows more internal links but takes longer.</li>' +
         '<li>Click <strong>Crawl</strong>. Progress updates appear in real-time.</li>' +
-        '<li>When complete, results show: stat cards, technology badges, security header audit, exposed paths with risk levels, forms detected (login/upload flagged), and a history of past scans.</li>' +
+        '<li>When complete, results show: stat cards, technology badges, security header audit, exposed paths with risk levels, forms detected, IOC listing, and a history of past scans.</li>' +
         '<li>Click <strong>AI Analysis</strong> on any result for a pentest-grade security assessment with risk rating, key findings, attack surface analysis, and prioritized recommendations.</li>' +
       '</ol>' +
 

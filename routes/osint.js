@@ -416,21 +416,24 @@ Assess: domain reputation, attack surface, potential risks, email security, host
 
   // POST /api/osint/recon — start a web recon scan
   app.post('/api/osint/recon', requireRole('analyst'), async (req, res) => {
-    const { target, spiderType, depth, maxPages, delay } = req.body;
-    if (!target || typeof target !== 'string') {
+    const { target, spiderType, depth, maxPages, delay, stealth, feeds } = req.body;
+
+    const validTypes = ['surface', 'exposed', 'fingerprint', 'threat-intel'];
+    const type = validTypes.includes(spiderType) ? spiderType : 'surface';
+
+    // threat-intel doesn't need a target URL
+    if (type !== 'threat-intel' && (!target || typeof target !== 'string')) {
       return res.status(400).json({ error: 'target URL required' });
     }
 
-    // Validate URL
     let targetUrl;
-    try {
-      targetUrl = new URL(target.startsWith('http') ? target : 'https://' + target);
-    } catch {
-      return res.status(400).json({ error: 'Invalid URL' });
+    if (type !== 'threat-intel') {
+      try {
+        targetUrl = new URL(target.startsWith('http') ? target : 'https://' + target);
+      } catch {
+        return res.status(400).json({ error: 'Invalid URL' });
+      }
     }
-
-    const validTypes = ['surface', 'exposed', 'fingerprint'];
-    const type = validTypes.includes(spiderType) ? spiderType : 'surface';
 
     const scanId = crypto.randomUUID();
     const recon = new WebRecon({
@@ -439,16 +442,16 @@ Assess: domain reputation, attack surface, potential risks, email security, host
       delay: Math.max(delay || 500, 200),
       respectRobots: true,
       timeout: 10000,
+      stealth: stealth === true,
     });
 
     activeRecons.set(scanId, { status: 'running', startedAt: new Date().toISOString() });
 
-    // Return immediately, run in background
-    res.json({ scanId, spiderType: type, target: targetUrl.href, status: 'running' });
+    const targetLabel = type === 'threat-intel' ? 'threat-feeds' : targetUrl.href;
+    res.json({ scanId, spiderType: type, target: targetLabel, status: 'running', stealth: stealth === true });
 
     // Execute in background
     try {
-      // Emit progress via Socket.IO
       if (ctx.io) {
         recon.on('progress', (p) => {
           ctx.io.emit('recon_progress', { scanId, ...p });
@@ -458,6 +461,7 @@ Assess: domain reputation, attack surface, potential risks, email security, host
       let result;
       if (type === 'surface') result = await recon.surface(targetUrl.href);
       else if (type === 'exposed') result = await recon.exposed(targetUrl.href);
+      else if (type === 'threat-intel') result = await recon.threatIntel(feeds);
       else result = await recon.fingerprint(targetUrl.href);
 
       result.id = scanId;
@@ -471,16 +475,18 @@ Assess: domain reputation, attack surface, potential risks, email security, host
       writeJSON(RECON_PATH, results);
 
       // Save to OSINT history
-      saveToHistory('recon-' + type, targetUrl.href,
-        `${type}: ${result.summary.pagesScanned} pages, ${result.summary.emailsFound} emails, ${result.summary.technologiesDetected} techs, ${result.summary.exposedPathsFound} exposed`);
+      const summaryText = type === 'threat-intel'
+        ? `threat-intel: ${result.summary.feedsSucceeded}/${result.summary.feedsQueried} feeds, ${result.summary.totalEntries} entries, ${result.summary.iocsExtracted} IOCs`
+        : `${type}: ${result.summary.pagesScanned} pages, ${result.summary.emailsFound} emails, ${result.summary.technologiesDetected} techs, ${(result.summary.iocsExtracted || 0)} IOCs`;
+      saveToHistory('recon-' + type, targetLabel, summaryText);
 
       activeRecons.set(scanId, { status: 'completed', result });
 
       if (ctx.io) {
-        ctx.io.emit('recon_complete', { scanId, spiderType: type, target: targetUrl.href, summary: result.summary });
+        ctx.io.emit('recon_complete', { scanId, spiderType: type, target: targetLabel, summary: result.summary });
       }
 
-      console.log(`  [WEB-RECON] ${type} scan ${scanId} completed: ${result.pagesScanned} pages in ${result.duration}ms`);
+      console.log(`  [WEB-RECON] ${type} scan ${scanId} completed in ${result.duration}ms`);
     } catch (e) {
       console.error(`  [WEB-RECON] Scan ${scanId} failed:`, e.message);
       activeRecons.set(scanId, { status: 'failed', error: e.message });

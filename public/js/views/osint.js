@@ -76,9 +76,10 @@ Views.osint = {
                 '<option value="surface">Surface Scan</option>' +
                 '<option value="exposed">Exposed Files</option>' +
                 '<option value="fingerprint">Tech Fingerprint</option>' +
+                '<option value="threat-intel">Threat Intel</option>' +
               '</select>' +
             '</div>' +
-            '<div class="form-group" style="min-width:80px;">' +
+            '<div class="form-group" id="recon-depth-group" style="min-width:80px;">' +
               '<label class="form-label">Depth</label>' +
               '<select class="form-select" id="recon-depth">' +
                 '<option value="1">1</option>' +
@@ -86,14 +87,19 @@ Views.osint = {
                 '<option value="3">3</option>' +
               '</select>' +
             '</div>' +
-            '<div class="form-group" style="align-self:flex-end;">' +
+            '<div class="form-group" style="align-self:flex-end;display:flex;align-items:center;gap:12px;">' +
+              '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-secondary);font-size:var(--font-size-xs);" title="Stealth mode: rotates user agents, randomizes timing, adds browser-like headers (Scrapling-inspired)">' +
+                '<input type="checkbox" id="recon-stealth" style="accent-color:var(--cyan);">' +
+                'Stealth' +
+              '</label>' +
               '<button class="btn btn-primary" id="recon-start-btn">Crawl</button>' +
             '</div>' +
           '</div>' +
           '<div style="margin-top:8px;color:var(--text-tertiary);font-size:var(--font-size-xs);line-height:1.5;">' +
-            '<strong>Surface Scan</strong> — Crawl pages, extract links/emails/tech/forms/headers. ' +
+            '<strong>Surface Scan</strong> — Crawl pages, extract links/emails/tech/IOCs/headers. ' +
             '<strong>Exposed Files</strong> — Check 50+ sensitive paths (.env, .git, backups, configs). ' +
-            '<strong>Tech Fingerprint</strong> — Deep stack detection from headers, HTML patterns, known paths.' +
+            '<strong>Tech Fingerprint</strong> — Deep stack detection + IOC extraction. ' +
+            '<strong>Threat Intel</strong> — Scrape public feeds (CISA KEV, abuse.ch, OpenPhish, IPsum).' +
           '</div>' +
         '</div>' +
         '<div id="recon-progress" style="display:none;margin-bottom:12px;" class="glass-card">' +
@@ -129,6 +135,12 @@ Views.osint = {
     document.getElementById('recon-start-btn').addEventListener('click', function() { self.startRecon(); });
     document.getElementById('recon-target').addEventListener('keydown', function(e) {
       if (e.key === 'Enter') self.startRecon();
+    });
+    // Toggle target/depth visibility for threat-intel mode
+    document.getElementById('recon-type').addEventListener('change', function() {
+      var isTI = this.value === 'threat-intel';
+      document.getElementById('recon-target').parentElement.style.display = isTI ? 'none' : '';
+      document.getElementById('recon-depth-group').style.display = isTI ? 'none' : '';
     });
 
     // Socket.IO progress for recon
@@ -515,27 +527,32 @@ Views.osint = {
   _reconScanId: null,
 
   startRecon: function() {
-    var target = document.getElementById('recon-target').value.trim();
-    if (!target) { Toast.warning('Enter a target URL'); return; }
-
     var type = document.getElementById('recon-type').value;
+    var target = document.getElementById('recon-target').value.trim();
+    if (type !== 'threat-intel' && !target) { Toast.warning('Enter a target URL'); return; }
+
     var depth = parseInt(document.getElementById('recon-depth').value) || 2;
+    var stealth = document.getElementById('recon-stealth').checked;
     var btn = document.getElementById('recon-start-btn');
     var progress = document.getElementById('recon-progress');
     var results = document.getElementById('recon-results');
 
     btn.disabled = true;
-    btn.textContent = 'Crawling...';
+    btn.textContent = type === 'threat-intel' ? 'Fetching...' : 'Crawling...';
     progress.style.display = 'block';
-    document.getElementById('recon-progress-text').textContent = 'Starting ' + type + ' scan...';
+    document.getElementById('recon-progress-text').textContent = 'Starting ' + type + ' scan...' + (stealth ? ' (stealth mode)' : '');
     results.innerHTML = '';
 
     var self = this;
+    var payload = { spiderType: type, depth: depth, maxPages: 30, delay: 500, stealth: stealth };
+    if (type !== 'threat-intel') payload.target = target;
+    else payload.target = 'threat-feeds';
+
     fetch('/api/osint/recon', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify({ target: target, spiderType: type, depth: depth, maxPages: 30, delay: 500 }),
+      body: JSON.stringify(payload),
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -613,13 +630,23 @@ Views.osint = {
 
   renderReconResult: function(data) {
     var container = document.getElementById('recon-results');
+
+    // Threat Intel has a different result structure
+    if (data.spiderType === 'threat-intel') {
+      this.renderThreatIntelResult(data);
+      return;
+    }
+
     var s = data.summary || {};
     var headerScore = s.securityHeaderScore !== null ? s.securityHeaderScore : '--';
     var headerColor = headerScore >= 80 ? 'var(--cyan)' : headerScore >= 50 ? 'var(--purple)' : 'var(--orange)';
+    var iocCount = s.iocsExtracted || 0;
 
     var html = '<div class="glass-card" style="margin-bottom:16px;">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
-        '<div class="glass-card-title">Results: ' + escapeHtml(data.target || '') + '</div>' +
+        '<div class="glass-card-title">Results: ' + escapeHtml(data.target || '') +
+          (data.stealth ? ' <span style="color:var(--cyan);font-size:var(--font-size-xs);font-weight:400;">STEALTH</span>' : '') +
+        '</div>' +
         '<button class="btn btn-ghost btn-sm" id="recon-ai-btn" data-id="' + escapeHtml(data.id || '') + '" style="color:var(--cyan);">AI Analysis</button>' +
       '</div>' +
 
@@ -629,6 +656,7 @@ Views.osint = {
         '<div class="stat-card"><div class="stat-card-label">Technologies</div><div class="stat-card-value" style="color:var(--cyan);">' + (s.technologiesDetected || 0) + '</div></div>' +
         '<div class="stat-card"><div class="stat-card-label">Exposed Paths</div><div class="stat-card-value" style="color:' + (s.exposedPathsFound ? 'var(--orange)' : 'var(--cyan)') + ';">' + (s.exposedPathsFound || 0) + '</div></div>' +
         '<div class="stat-card"><div class="stat-card-label">Header Score</div><div class="stat-card-value" style="color:' + headerColor + ';">' + headerScore + '%</div></div>' +
+        '<div class="stat-card"><div class="stat-card-label">IOCs Found</div><div class="stat-card-value" style="color:' + (iocCount ? 'var(--orange)' : 'var(--text-tertiary)') + ';">' + iocCount + '</div></div>' +
         '<div class="stat-card"><div class="stat-card-label">Duration</div><div class="stat-card-value" style="font-size:var(--font-size-sm);">' + ((data.duration || 0) / 1000).toFixed(1) + 's</div></div>' +
       '</div>';
 
@@ -698,6 +726,31 @@ Views.osint = {
       html += '</tbody></table></div>';
     }
 
+    // IOCs section
+    var iocs = data.iocs || {};
+    var hasIOCs = (iocs.ipv4 && iocs.ipv4.length) || (iocs.md5 && iocs.md5.length) || (iocs.sha256 && iocs.sha256.length) || (iocs.cves && iocs.cves.length);
+    if (hasIOCs) {
+      html += '<div style="margin-bottom:12px;"><div style="font-weight:600;color:var(--text-primary);margin-bottom:6px;">Indicators of Compromise (IOCs)</div>';
+      if (iocs.cves && iocs.cves.length) {
+        html += '<div style="margin-bottom:6px;"><span style="color:var(--text-tertiary);font-size:var(--font-size-xs);">CVEs:</span> ';
+        iocs.cves.forEach(function(c) { html += '<span class="badge" style="background:rgba(255,107,43,0.1);color:var(--orange);border:1px solid rgba(255,107,43,0.2);padding:2px 8px;border-radius:10px;font-size:var(--font-size-xs);margin:2px;">' + escapeHtml(c) + '</span>'; });
+        html += '</div>';
+      }
+      if (iocs.ipv4 && iocs.ipv4.length) {
+        html += '<div style="margin-bottom:6px;"><span style="color:var(--text-tertiary);font-size:var(--font-size-xs);">IPs (' + iocs.ipv4.length + '):</span> ' +
+          '<span style="font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--text-secondary);">' + iocs.ipv4.slice(0, 20).map(function(ip) { return escapeHtml(ip); }).join(', ') + (iocs.ipv4.length > 20 ? '...' : '') + '</span></div>';
+      }
+      if (iocs.md5 && iocs.md5.length) {
+        html += '<div style="margin-bottom:6px;"><span style="color:var(--text-tertiary);font-size:var(--font-size-xs);">MD5 (' + iocs.md5.length + '):</span> ' +
+          '<span style="font-family:var(--font-mono);font-size:10px;color:var(--text-secondary);word-break:break-all;">' + iocs.md5.slice(0, 10).map(function(h) { return escapeHtml(h); }).join(', ') + (iocs.md5.length > 10 ? '...' : '') + '</span></div>';
+      }
+      if (iocs.sha256 && iocs.sha256.length) {
+        html += '<div style="margin-bottom:6px;"><span style="color:var(--text-tertiary);font-size:var(--font-size-xs);">SHA256 (' + iocs.sha256.length + '):</span> ' +
+          '<span style="font-family:var(--font-mono);font-size:10px;color:var(--text-secondary);word-break:break-all;">' + iocs.sha256.slice(0, 5).map(function(h) { return escapeHtml(h); }).join(', ') + (iocs.sha256.length > 5 ? '...' : '') + '</span></div>';
+      }
+      html += '</div>';
+    }
+
     html += '<div id="recon-ai-result"></div></div>';
     container.innerHTML = html;
 
@@ -717,6 +770,78 @@ Views.osint = {
           .catch(function() { resultEl.innerHTML = '<div style="color:var(--orange);">AI analysis failed</div>'; });
       });
     }
+  },
+
+  renderThreatIntelResult: function(data) {
+    var container = document.getElementById('recon-results');
+    var s = data.summary || {};
+    var iocs = data.iocs || {};
+    var totalIOCs = (iocs.ipv4 || []).length + (iocs.md5 || []).length + (iocs.sha256 || []).length + (iocs.cves || []).length;
+
+    var html = '<div class="glass-card" style="margin-bottom:16px;">' +
+      '<div class="glass-card-title" style="margin-bottom:12px;">Threat Intelligence Collection</div>' +
+
+      '<div class="stat-grid" style="margin-bottom:16px;">' +
+        '<div class="stat-card"><div class="stat-card-label">Feeds Queried</div><div class="stat-card-value">' + (s.feedsQueried || 0) + '</div></div>' +
+        '<div class="stat-card"><div class="stat-card-label">Feeds OK</div><div class="stat-card-value" style="color:var(--cyan);">' + (s.feedsSucceeded || 0) + '</div></div>' +
+        '<div class="stat-card"><div class="stat-card-label">Total Entries</div><div class="stat-card-value">' + (s.totalEntries || 0) + '</div></div>' +
+        '<div class="stat-card"><div class="stat-card-label">IOCs Extracted</div><div class="stat-card-value" style="color:' + (totalIOCs ? 'var(--orange)' : 'var(--text-tertiary)') + ';">' + totalIOCs + '</div></div>' +
+        '<div class="stat-card"><div class="stat-card-label">Duration</div><div class="stat-card-value" style="font-size:var(--font-size-sm);">' + ((data.duration || 0) / 1000).toFixed(1) + 's</div></div>' +
+      '</div>';
+
+    // Feed results table
+    var feeds = data.feeds || [];
+    if (feeds.length) {
+      html += '<div style="margin-bottom:12px;"><div style="font-weight:600;color:var(--text-primary);margin-bottom:6px;">Feed Results</div>' +
+        '<table class="data-table"><thead><tr><th>Feed</th><th>Status</th><th>Entries</th><th>Time</th></tr></thead><tbody>';
+      feeds.forEach(function(f) {
+        var statusColor = f.status === 'ok' ? 'var(--cyan)' : 'var(--orange)';
+        html += '<tr>' +
+          '<td style="color:var(--text-primary);font-size:var(--font-size-xs);">' + escapeHtml(f.name) + '</td>' +
+          '<td style="color:' + statusColor + ';text-transform:uppercase;font-size:var(--font-size-xs);font-weight:600;">' + escapeHtml(f.status) + '</td>' +
+          '<td>' + (f.entries || 0) + '</td>' +
+          '<td style="color:var(--text-tertiary);font-size:var(--font-size-xs);">' + (f.fetchedAt ? new Date(f.fetchedAt).toLocaleTimeString() : '--') + '</td>' +
+          '</tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+
+    // CISA KEV entries (if present)
+    var cisaFeed = feeds.find(function(f) { return f.feed === 'cisa_kev' && f.data && f.data.length; });
+    if (cisaFeed) {
+      html += '<div style="margin-bottom:12px;"><div style="font-weight:600;color:var(--text-primary);margin-bottom:6px;">CISA Known Exploited Vulnerabilities (Latest ' + Math.min(cisaFeed.data.length, 15) + ')</div>' +
+        '<table class="data-table"><thead><tr><th>CVE</th><th>Vendor</th><th>Product</th><th>Due Date</th></tr></thead><tbody>';
+      cisaFeed.data.slice(0, 15).forEach(function(v) {
+        html += '<tr>' +
+          '<td style="color:var(--orange);font-family:var(--font-mono);font-size:var(--font-size-xs);">' + escapeHtml(v.cve || '') + '</td>' +
+          '<td style="font-size:var(--font-size-xs);">' + escapeHtml(v.vendor || '') + '</td>' +
+          '<td style="font-size:var(--font-size-xs);">' + escapeHtml(v.product || '') + '</td>' +
+          '<td style="font-size:var(--font-size-xs);color:var(--text-tertiary);">' + escapeHtml(v.dueDate || '') + '</td>' +
+          '</tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+
+    // Extracted IOCs
+    if (totalIOCs > 0) {
+      html += '<div style="margin-bottom:12px;"><div style="font-weight:600;color:var(--text-primary);margin-bottom:6px;">Extracted IOCs</div>';
+      if (iocs.ipv4 && iocs.ipv4.length) {
+        html += '<div style="margin-bottom:6px;"><span class="badge" style="background:rgba(255,107,43,0.1);color:var(--orange);padding:2px 8px;border-radius:10px;font-size:var(--font-size-xs);">IPs: ' + iocs.ipv4.length + '</span> ' +
+          '<span style="font-family:var(--font-mono);font-size:10px;color:var(--text-secondary);">' + iocs.ipv4.slice(0, 30).map(function(ip) { return escapeHtml(ip); }).join(', ') + (iocs.ipv4.length > 30 ? '...' : '') + '</span></div>';
+      }
+      if (iocs.cves && iocs.cves.length) {
+        html += '<div style="margin-bottom:6px;"><span class="badge" style="background:rgba(255,107,43,0.1);color:var(--orange);padding:2px 8px;border-radius:10px;font-size:var(--font-size-xs);">CVEs: ' + iocs.cves.length + '</span> ' +
+          '<span style="font-family:var(--font-mono);font-size:10px;color:var(--text-secondary);">' + iocs.cves.slice(0, 20).map(function(c) { return escapeHtml(c); }).join(', ') + (iocs.cves.length > 20 ? '...' : '') + '</span></div>';
+      }
+      if (iocs.md5 && iocs.md5.length) {
+        html += '<div style="margin-bottom:6px;"><span class="badge" style="background:rgba(255,107,43,0.1);color:var(--orange);padding:2px 8px;border-radius:10px;font-size:var(--font-size-xs);">MD5: ' + iocs.md5.length + '</span> ' +
+          '<span style="font-family:var(--font-mono);font-size:10px;color:var(--text-secondary);word-break:break-all;">' + iocs.md5.slice(0, 10).map(function(h) { return escapeHtml(h); }).join(', ') + (iocs.md5.length > 10 ? '...' : '') + '</span></div>';
+      }
+      html += '</div>';
+    }
+
+    html += '</div>';
+    container.innerHTML = html;
   },
 
   loadReconHistory: function() {
