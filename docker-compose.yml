@@ -7,7 +7,7 @@ services:
     environment:
       - VIGIL_PORT=4100
       - VIGIL_USER=${VIGIL_USER:-admin}
-      - VIGIL_PASS=${VIGIL_PASS:-admin}
+      - VIGIL_PASS=${VIGIL_PASS:-}
       - DATABASE_URL=postgresql://vigil:vigil@postgres:5432/vigil
       - NODE_ENV=production
       - AI_PROVIDER=${AI_PROVIDER:-claude-cli}

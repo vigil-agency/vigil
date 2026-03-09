@@ -69,15 +69,23 @@ COPY data/ ./data/
 COPY docs/ ./docs/
 COPY public/ ./public/
 
-RUN mkdir -p /app/data/reports /app/data/backups /home/vigil/.config/gh && \
+RUN mkdir -p /app/data/reports /app/data/backups /home/vigil/.config/gh /home/vigil/.claude && \
     chown -R vigil:vigil /app /home/vigil
+
+# Entrypoint: fix ownership of mounted dirs then exec as vigil
+RUN printf '#!/bin/bash\nchown -R vigil:vigil /home/vigil/.claude 2>/dev/null || true\nexec gosu vigil "$@"\n' > /usr/local/bin/entrypoint.sh && \
+    chmod +x /usr/local/bin/entrypoint.sh
+
+# gosu for dropping root after fixing permissions
+RUN curl -fsSL "https://github.com/tianon/gosu/releases/download/1.17/gosu-amd64" -o /usr/local/bin/gosu && \
+    chmod +x /usr/local/bin/gosu
 
 ENV VIGIL_PORT=4100
 ENV HOME=/home/vigil
 
 EXPOSE 4100
 
-USER vigil
+ENTRYPOINT ["entrypoint.sh"]
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
     CMD curl -sf http://localhost:4100/api/health || exit 1
