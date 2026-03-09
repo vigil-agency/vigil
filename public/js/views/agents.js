@@ -207,6 +207,7 @@ Views.agents = {
     html += '<div style="margin-bottom:16px;padding:12px;border-radius:8px;background:rgba(34,211,238,0.03);border:1px solid rgba(34,211,238,0.1);">' +
       '<div class="form-label" style="color:var(--cyan);">Run This Agent</div>' +
       '<textarea class="form-textarea" id="agent-inline-input" rows="3" placeholder="' + escapeHtml(agent.placeholder || 'Enter target or input for the agent...') + '" style="margin-bottom:8px;"></textarea>' +
+      this._renderExampleButtons(agent, 'agent-inline-input') +
       '<button class="btn btn-primary btn-sm" id="agent-inline-run">Run ' + escapeHtml(agent.name) + '</button>' +
       '</div>';
 
@@ -228,6 +229,9 @@ Views.agents = {
     html += '<div><div class="form-label">Run History</div><div id="agent-history-list"><div class="loading-state"><div class="spinner spinner-sm"></div></div></div></div>';
 
     body.innerHTML = html;
+
+    // Example buttons fill textarea
+    this._bindExampleButtons(body, agent);
 
     // Inline run button
     var self = this;
@@ -315,6 +319,7 @@ Views.agents = {
     var agent = this._agents.find(function(a) { return a.id === id; });
     if (!agent) return;
 
+    var self = this;
     Modal.open({
       title: 'Run: ' + (agent.name || 'Agent'),
       body:
@@ -322,11 +327,14 @@ Views.agents = {
         '<div class="form-group">' +
           '<label class="form-label">Input / Target</label>' +
           '<textarea class="form-textarea" id="agent-run-input" rows="4" placeholder="' + escapeHtml(agent.placeholder || 'Enter target, paste data, or describe what to analyze...') + '"></textarea>' +
+          self._renderExampleButtons(agent, 'agent-run-input') +
         '</div>',
       footer: '<button class="btn btn-ghost" onclick="Modal.close()">Cancel</button><button class="btn btn-primary" id="agent-run-confirm">Run Agent</button>'
     });
 
-    var self = this;
+    // Example buttons in modal
+    self._bindExampleButtons(document.querySelector('.modal-backdrop') || document.body, agent);
+
     document.getElementById('agent-run-confirm').addEventListener('click', function() {
       var input = document.getElementById('agent-run-input').value.trim();
       if (!input) { Toast.warning('Enter input for the agent'); return; }
@@ -392,6 +400,33 @@ Views.agents = {
       .catch(function() {
         container.innerHTML = '<div style="color:var(--text-tertiary);font-size:var(--font-size-xs);">Could not load history</div>';
       });
+  },
+
+  _renderExampleButtons: function(agent, textareaId) {
+    if (!agent.examples || !agent.examples.length) return '';
+    var html = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;align-items:center;">' +
+      '<span style="color:var(--text-tertiary);font-size:var(--font-size-xs);">Try:</span>';
+    agent.examples.forEach(function(ex, i) {
+      html += '<button class="btn btn-ghost btn-sm agent-example-btn" ' +
+        'data-textarea="' + textareaId + '" data-example-idx="' + i + '" ' +
+        'style="color:var(--cyan);border-color:rgba(34,211,238,0.2);font-size:10px;padding:2px 8px;">' +
+        escapeHtml(ex.label) + '</button>';
+    });
+    html += '</div>';
+    return html;
+  },
+
+  _bindExampleButtons: function(container, agent) {
+    container.querySelectorAll('.agent-example-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var idx = parseInt(btn.getAttribute('data-example-idx'), 10);
+        var textarea = document.getElementById(btn.getAttribute('data-textarea'));
+        if (textarea && agent.examples && agent.examples[idx]) {
+          textarea.value = agent.examples[idx].input;
+          textarea.focus();
+        }
+      });
+    });
   },
 
   showCreateModal: function() {
