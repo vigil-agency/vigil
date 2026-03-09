@@ -341,6 +341,34 @@ Views.docs = {
       '<p><strong>Q: What is the "Validate Exploitability" button?</strong><br>A: After a code audit completes, each finding has a <strong>Validate Exploitability</strong> button. Clicking it runs the Raptor 4-step MUST-GATE analysis on that specific finding: (1) Source Control &mdash; can an attacker control the input? (2) Sanitizer Effectiveness &mdash; can validation be bypassed? (3) Reachability &mdash; can the code path be triggered? (4) Impact &mdash; what is the worst case? The result shows a verdict badge (EXPLOITABLE in orange, FALSE_POSITIVE in cyan) with pass/fail for each step, attack vector, validated PoC, and reasoning. Takes ~60-90 seconds per finding.</p>' +
       '<p><strong>Q: How do I use Validate Exploitability?</strong><br>A: Sidebar &rarr; <strong>Scanning</strong> &rarr; <strong>Code Audit</strong>. (1) Enter a directory path and click <strong>Run Code Audit</strong>. (2) Wait for scan to finish (progress bar shows phases). (3) In the results table, click any finding row to expand its details. (4) Click the <strong>Validate Exploitability</strong> button (cyan border, bottom of finding details). (5) Wait ~60-90s &mdash; a spinner shows "Running MUST-GATE exploitability validation." (6) Review: verdict badge (orange = exploitable, cyan = false positive), 4-step table with pass/fail per step, attack vector, PoC, and reasoning. Use this to triage real vulnerabilities from noise before spending time on fixes.</p>' +
 
+      /* Binary Analysis */
+      '<h3 style="color:var(--cyan);margin:28px 0 8px;font-size:var(--font-size-lg);">Binary Analysis</h3>' +
+      '<p>Lightweight binary file inspection using standard Linux tools (<code style="background:var(--well);padding:1px 4px;border-radius:3px;">file</code>, <code style="background:var(--well);padding:1px 4px;border-radius:3px;">strings</code>, <code style="background:var(--well);padding:1px 4px;border-radius:3px;">readelf</code>, <code style="background:var(--well);padding:1px 4px;border-radius:3px;">objdump</code>) plus AI threat assessment. Analyzes ELF and PE binaries for malware indicators, suspicious imports, IOCs, and structural anomalies. Accessible as a tab within the Code Audit view.</p>' +
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">What it extracts:</p>' +
+      '<ul style="padding-left:20px;list-style:disc;">' +
+        '<li><strong>File identification</strong> &mdash; MIME type, format, architecture, endianness via <code style="background:var(--well);padding:1px 4px;border-radius:3px;">file</code> command</li>' +
+        '<li><strong>Cryptographic hashes</strong> &mdash; MD5, SHA-1, SHA-256 for signature matching</li>' +
+        '<li><strong>Entropy analysis</strong> &mdash; Shannon entropy to detect packing (&gt;7.0) or encryption (&gt;7.5)</li>' +
+        '<li><strong>String extraction</strong> &mdash; URLs, IPv4 addresses, email addresses, domains, CVEs, registry keys, file paths, base64 blobs</li>' +
+        '<li><strong>Suspicious imports</strong> &mdash; 60+ dangerous API calls (process injection, anti-debug, crypto, persistence, network)</li>' +
+        '<li><strong>Binary structure</strong> &mdash; ELF/PE section headers, dynamic symbols, shared libraries, imports/exports</li>' +
+        '<li><strong>AI threat assessment</strong> &mdash; LLM analyzes all extracted metadata and produces a structured malware analysis report with MITRE ATT&amp;CK mapping</li>' +
+      '</ul>' +
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">How to use:</p>' +
+      '<ol style="padding-left:20px;">' +
+        '<li>Navigate to <strong>Scanning &gt; Code Audit</strong></li>' +
+        '<li>Click the <strong>Binary Analysis</strong> tab (next to Source Code)</li>' +
+        '<li>Enter the full path to a binary file (e.g., <code style="background:var(--well);padding:1px 4px;border-radius:3px;">/usr/bin/nmap</code> in Docker)</li>' +
+        '<li>Click <strong>Analyze Binary</strong> &mdash; runs in background with real-time progress</li>' +
+        '<li>Results show: file info, risk indicators, suspicious imports, IOCs, sections, libraries, and AI threat assessment</li>' +
+        '<li>Risk indicators auto-appear in the <strong>Findings</strong> view (filter by "Binary Analysis" type)</li>' +
+      '</ol>' +
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">FAQ:</p>' +
+      '<p><strong>Q: What file types are supported?</strong><br>A: Any binary file up to 50MB. Best results with ELF (Linux) and PE (Windows) executables. Also works on shared libraries (.so, .dll), object files, and other binary formats.</p>' +
+      '<p><strong>Q: Does it require AI?</strong><br>A: The AI threat assessment phase is optional. Without AI configured, you still get file identification, hashes, entropy, string extraction, IOCs, suspicious imports, and binary structure analysis. AI adds the overall threat narrative and MITRE mapping.</p>' +
+      '<p><strong>Q: What tools does it use?</strong><br>A: Standard Linux utilities already in the Docker container: <code style="background:var(--well);padding:1px 4px;border-radius:3px;">file</code> (identification), <code style="background:var(--well);padding:1px 4px;border-radius:3px;">strings</code> (text extraction), <code style="background:var(--well);padding:1px 4px;border-radius:3px;">readelf</code> (ELF structure), <code style="background:var(--well);padding:1px 4px;border-radius:3px;">objdump</code> (disassembly headers). No Ghidra or Java required.</p>' +
+      '<p><strong>Q: How long does analysis take?</strong><br>A: Without AI: 1-5 seconds. With AI threat assessment: 15-45 seconds depending on binary complexity. The <code style="background:var(--well);padding:1px 4px;border-radius:3px;">/usr/bin/nmap</code> binary (4MB, 6277 strings) completes in ~33 seconds with AI.</p>' +
+
       /* Proxy Nodes */
       '<h3 style="color:var(--cyan);margin:28px 0 8px;font-size:var(--font-size-lg);">Proxy Nodes (Ephemeral Infrastructure)</h3>' +
       '<p>Disposable scanning infrastructure using GitHub Codespaces. Each node provides a unique exit IP via SOCKS5 proxy, enabling anonymous scanning during authorized penetration tests. Inspired by fluffy-barnacle.</p>' +
@@ -363,7 +391,42 @@ Views.docs = {
       '<p><strong>Q: How do I set up GitHub CLI?</strong><br>A: Install with <code style="background:var(--well);padding:1px 4px;border-radius:3px;">apt install gh</code>, then authenticate with <code style="background:var(--well);padding:1px 4px;border-radius:3px;">gh auth login</code>. Select GitHub.com, HTTPS, and "Login with a web browser." Open the device URL on any browser, enter the code, and authorize. See Scanner Setup for full instructions.</p>' +
       '<p><strong>Q: Is this free?</strong><br>A: GitHub free accounts include 120 core-hours/month of Codespaces. A basic node (2-core) costs 2 core-hours per hour. That gives ~60 hours of proxy time per month at no cost.</p>' +
       '<p><strong>Q: Do I need gh CLI in the Docker container?</strong><br>A: Yes. The Vigil Docker image includes gh CLI pre-installed. You just need to authenticate it once: <code style="background:var(--well);padding:1px 4px;border-radius:3px;">docker exec -it vigil gh auth login</code>. Or mount your host config: <code style="background:var(--well);padding:1px 4px;border-radius:3px;">~/.config/gh:/home/vigil/.config/gh:ro</code> in docker-compose.yml volumes.</p>' +
-      '<p><strong>Q: What if gh CLI is not installed?</strong><br>A: The Proxy Nodes view shows a Prerequisites panel with setup instructions. All other Vigil features work normally without gh.</p>',
+      '<p><strong>Q: What if gh CLI is not installed?</strong><br>A: The Proxy Nodes view shows a Prerequisites panel with setup instructions. All other Vigil features work normally without gh.</p>' +
+
+      /* SSH Tunnels */
+      '<h3 style="color:var(--cyan);margin:28px 0 8px;font-size:var(--font-size-lg);">SSH Tunnels (pgrok-inspired)</h3>' +
+      '<p>Create and manage SSH tunnels for port forwarding, reverse tunnels, and SOCKS5 proxying. Accessible from the <strong>SSH Tunnels</strong> tab in Proxy Nodes. Inspired by the pgrok project.</p>' +
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">Tunnel Types:</p>' +
+      '<ul style="padding-left:20px;list-style:disc;">' +
+        '<li><strong>Forward (-L)</strong> &mdash; Access a remote service through a local port. Example: Forward local port 8080 to remote MySQL on port 3306.</li>' +
+        '<li><strong>Reverse (-R)</strong> &mdash; Expose a local service to a remote server. Example: Make your local web server accessible via the remote host.</li>' +
+        '<li><strong>Dynamic (-D)</strong> &mdash; SOCKS5 proxy through SSH. All traffic routed through the SSH server as exit point.</li>' +
+      '</ul>' +
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">Features:</p>' +
+      '<ul style="padding-left:20px;list-style:disc;">' +
+        '<li><strong>Auto-Reconnect</strong> &mdash; Exponential backoff (2s &rarr; 4s &rarr; 8s &rarr; 16s max). Resets after 60s stable connection.</li>' +
+        '<li><strong>Health Check</strong> &mdash; Verifies tunnel is alive by checking if the local port is listening.</li>' +
+        '<li><strong>SSH Key Support</strong> &mdash; Optional SSH key path for key-based authentication.</li>' +
+      '</ul>' +
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">FAQ:</p>' +
+      '<p><strong>Q: Do SSH tunnels require gh CLI?</strong><br>A: No. SSH tunnels use standard <code style="background:var(--well);padding:1px 4px;border-radius:3px;">ssh</code> commands and work independently of GitHub Codespaces.</p>' +
+      '<p><strong>Q: What happens if the SSH connection drops?</strong><br>A: With auto-reconnect enabled (default), the tunnel automatically reconnects with exponential backoff. The reconnect count is shown in the tunnels table.</p>' +
+
+      /* Callback Listener */
+      '<h3 style="color:var(--cyan);margin:28px 0 8px;font-size:var(--font-size-lg);">OOB Callback Listener</h3>' +
+      '<p>Built-in HTTP callback listener for blind/out-of-band (OOB) vulnerability detection. Replaces the need for external services like interactsh or Burp Collaborator. Accessible from the <strong>Callback Listener</strong> tab in Proxy Nodes.</p>' +
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">How it works:</p>' +
+      '<ol style="padding-left:20px;">' +
+        '<li><strong>Start Listener</strong> &mdash; Launches an HTTP server on a configurable port (default 9999)</li>' +
+        '<li><strong>Get Callback URL</strong> &mdash; A unique secret-based URL is generated (e.g., <code style="background:var(--well);padding:1px 4px;border-radius:3px;">http://YOUR_IP:9999/abc123</code>)</li>' +
+        '<li><strong>Inject URL</strong> &mdash; Use the callback URL in scan payloads (SSRF, XXE, blind XSS, etc.)</li>' +
+        '<li><strong>Monitor</strong> &mdash; Any request hitting the callback URL is captured with full details (method, headers, body, source IP)</li>' +
+        '<li><strong>Detect</strong> &mdash; Requests matching the secret path are flagged as <span style="color:var(--orange);">TARGETED</span>, confirming the vulnerability triggered</li>' +
+      '</ol>' +
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">FAQ:</p>' +
+      '<p><strong>Q: What is "targeted" vs non-targeted?</strong><br>A: Targeted requests hit the secret path (e.g., <code style="background:var(--well);padding:1px 4px;border-radius:3px;">/abc123</code>) — these confirm a vulnerability callback. Non-targeted requests hit any other path — could be scanners, bots, or background noise.</p>' +
+      '<p><strong>Q: How do I use this for blind SSRF detection?</strong><br>A: Start the listener, copy the callback URL, inject it into SSRF-vulnerable parameters (e.g., <code style="background:var(--well);padding:1px 4px;border-radius:3px;">url=http://YOUR_IP:9999/secret</code>). If the server fetches the URL, you will see a targeted callback in the log.</p>' +
+      '<p><strong>Q: Is the listener accessible from outside?</strong><br>A: The listener binds to 0.0.0.0 inside the container. You need to expose the port in docker-compose.yml (e.g., <code style="background:var(--well);padding:1px 4px;border-radius:3px;">- "9999:9999"</code>) for external targets to reach it.</p>',
 
 
     /* ===== AGENTS & CAMPAIGNS ===== */
@@ -423,6 +486,32 @@ Views.docs = {
       '</ol>' +
       '<p><strong>Q: How does Vigil choose which agents to run?</strong><br>A: AI selects the most relevant agents based on your goal description and available agent capabilities. A "security assessment" might use Port Scanner + HTTP Header Auditor + TLS Analyzer.</p>' +
 
+      /* Purple Team Simulator */
+      '<h3 style="color:var(--cyan);margin:28px 0 8px;font-size:var(--font-size-lg);">Purple Team Simulator (Decepticon-inspired)</h3>' +
+      '<p>AI-driven attack-defense gap analysis through the MITRE ATT&amp;CK kill chain. Simulates realistic attack scenarios against your described infrastructure and evaluates defensive coverage across 10 ATT&amp;CK tactics. Produces defense grades, coverage heatmaps, critical gaps, and prioritized recommendations. Inspired by <a href="https://github.com/PurpleAILAB/Decepticon" style="color:var(--cyan);">Decepticon</a>\'s autonomous red team architecture.</p>' +
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">Threat Scenarios:</p>' +
+      '<ul style="padding-left:20px;list-style:disc;">' +
+        '<li><strong>External Threat Actor</strong> &mdash; Sophisticated attacker from the internet</li>' +
+        '<li><strong>Insider Threat</strong> &mdash; Malicious or compromised insider with legitimate access</li>' +
+        '<li><strong>Ransomware Operator</strong> &mdash; Gang seeking to encrypt and exfiltrate data</li>' +
+        '<li><strong>APT / Nation-State</strong> &mdash; Advanced persistent threat with long-term objectives</li>' +
+        '<li><strong>Supply Chain Attack</strong> &mdash; Attacker compromising a third-party vendor</li>' +
+      '</ul>' +
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">How to use:</p>' +
+      '<ol style="padding-left:20px;">' +
+        '<li>Navigate to <strong>Agents &gt; Campaigns</strong></li>' +
+        '<li>Click the <strong>Purple Team</strong> tab</li>' +
+        '<li>Enter your target description (be specific &mdash; include tech stack, cloud provider, key services)</li>' +
+        '<li>Optionally set scope, threat scenario, and known defenses</li>' +
+        '<li>Click <strong>Run Simulation</strong> &mdash; AI analyzes 10 ATT&amp;CK tactics (~60-90 seconds)</li>' +
+        '<li>Review: Defense Grade (A-F), ATT&amp;CK coverage heatmap, attack path narrative, critical gaps, prioritized recommendations</li>' +
+        '<li>Click any tactic card for detailed attack scenario + defense evaluation</li>' +
+      '</ol>' +
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">FAQ:</p>' +
+      '<p><strong>Q: Does this run actual attacks?</strong><br>A: No. The simulator uses AI reasoning to model attack scenarios and evaluate defenses &mdash; no actual scanning or exploitation occurs. It is safe to run against any target description.</p>' +
+      '<p><strong>Q: How are scores calculated?</strong><br>A: Detection and Prevention scores (0-100%) are AI-estimated per tactic. Defense Score = average of detection + prevention. Grade: A (80%+), B (65%+), C (50%+), D (35%+), F (&lt;35%). Overall Risk = likelihood * (100 - prevention) / 100.</p>' +
+      '<p><strong>Q: How specific should my target description be?</strong><br>A: The more specific, the better. Include: tech stack, cloud provider, authentication method, key services, data sensitivity. Vague descriptions produce generic results.</p>' +
+
       /* Raptor Adversarial Agents */
       '<h3 style="color:var(--cyan);margin:28px 0 8px;font-size:var(--font-size-lg);">Raptor Adversarial Agents</h3>' +
       '<p>5 specialized agents powered by MUST-GATE adversarial reasoning. They think like attackers: assume everything is exploitable, trace full data flows, provide concrete proof-of-concepts, and never hedge without verification. These produce 3-14K chars of detailed professional-grade analysis.</p>' +
@@ -463,7 +552,51 @@ Views.docs = {
       '<p><strong>Q: What is MUST-GATE?</strong><br>A: 7 forced reasoning constraints that prevent the AI from cutting corners. ASSUME-EXPLOIT (assume exploitable until proven otherwise), NO-HEDGING (verify every "maybe"), FULL-COVERAGE (trace entire data flow), PROOF (concrete PoC required), STRICT-SEQUENCE (follow steps in order), CHECKLIST (pass/fail each check), CONSISTENCY (verdict must match evidence).</p>' +
       '<p><strong>Q: How is this different from regular agents?</strong><br>A: Regular agents give general security analysis. Raptor agents use adversarial thinking patterns &mdash; they assume the worst, trace full attack paths source-to-sink, provide concrete proof-of-concepts, and give definitive verdicts instead of vague warnings. The output is suitable for professional pentest reports.</p>' +
       '<p><strong>Q: I don\'t know what to type in the input box.</strong><br>A: Each Raptor agent has <strong>Try:</strong> buttons below the textarea with pre-built examples. Click any example to auto-fill the input with a realistic scenario (code snippet, finding, architecture description, etc.). Edit it to match your actual target, or just click Run to see how the agent works.</p>' +
-      '<p><strong>Q: Why do Raptor agents take longer?</strong><br>A: They produce 3-14K chars of structured analysis with code references, CWE IDs, MITRE ATT&amp;CK mappings, PoC exploits, and step-by-step validation. The 180-second timeout accommodates this depth. Simpler agents return in 10-30 seconds.</p>',
+      '<p><strong>Q: Why do Raptor agents take longer?</strong><br>A: They produce 3-14K chars of structured analysis with code references, CWE IDs, MITRE ATT&amp;CK mappings, PoC exploits, and step-by-step validation. The 180-second timeout accommodates this depth. Simpler agents return in 10-30 seconds.</p>' +
+
+      /* Pentest Command Library (Reconmap-inspired) */
+      '<h3 style="color:var(--cyan);margin:28px 0 8px;font-size:var(--font-size-lg);">Pentest Command Library (Reconmap-inspired)</h3>' +
+      '<p>18 pre-built parameterized security commands organized by engagement phase. Create projects from templates, execute commands against targets, track findings, and generate AI pentest reports. Inspired by <a href="https://github.com/reconmap/reconmap" style="color:var(--cyan);">Reconmap</a>\'s command database pattern.</p>' +
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">Commands by Phase:</p>' +
+      '<table class="data-table" style="font-size:var(--font-size-xs);"><thead><tr><th>Phase</th><th>Command</th><th>Tool</th><th>Description</th></tr></thead><tbody>' +
+        '<tr><td style="color:var(--cyan);">Recon</td><td>Host Discovery</td><td>nmap</td><td>Ping sweep to find live hosts</td></tr>' +
+        '<tr><td style="color:var(--cyan);">Recon</td><td>DNS Lookup</td><td>dig</td><td>Resolve A, MX, NS, TXT, SOA records</td></tr>' +
+        '<tr><td style="color:var(--cyan);">Recon</td><td>WHOIS Lookup</td><td>whois</td><td>Domain/IP registration info</td></tr>' +
+        '<tr><td style="color:var(--cyan);">Recon</td><td>SSL Certificate</td><td>openssl</td><td>Certificate details and chain</td></tr>' +
+        '<tr><td style="color:var(--cyan);">Recon</td><td>Traceroute</td><td>traceroute</td><td>Network path trace</td></tr>' +
+        '<tr><td style="color:var(--orange);">Scanning</td><td>Quick Port Scan</td><td>nmap</td><td>Top 1000 ports + service detection</td></tr>' +
+        '<tr><td style="color:var(--orange);">Scanning</td><td>Full TCP Scan</td><td>nmap</td><td>All 65535 TCP ports</td></tr>' +
+        '<tr><td style="color:var(--orange);">Scanning</td><td>Vulnerability Scan</td><td>nuclei</td><td>Template-based vuln scanning</td></tr>' +
+        '<tr><td style="color:var(--orange);">Scanning</td><td>Web Server Scan</td><td>nikto</td><td>Web server misconfiguration</td></tr>' +
+        '<tr><td style="color:var(--orange);">Scanning</td><td>SSL/TLS Audit</td><td>nmap</td><td>Cipher + protocol enumeration</td></tr>' +
+        '<tr><td style="color:var(--orange);">Exploitation</td><td>Banner Grab</td><td>nmap</td><td>Service version fingerprinting</td></tr>' +
+        '<tr><td style="color:var(--orange);">Exploitation</td><td>HTTP Methods</td><td>nmap</td><td>Test PUT, DELETE, etc.</td></tr>' +
+        '<tr><td style="color:var(--orange);">Exploitation</td><td>Default Creds</td><td>nmap</td><td>Common credential testing</td></tr>' +
+        '<tr><td style="color:var(--orange);">Exploitation</td><td>NSE Vuln Scripts</td><td>nmap</td><td>Nmap vuln detection scripts</td></tr>' +
+      '</tbody></table>' +
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">Engagement Templates:</p>' +
+      '<ul style="padding-left:20px;list-style:disc;">' +
+        '<li><strong>Web Application Pentest</strong> &mdash; OWASP WSTG methodology, full 4-phase workflow</li>' +
+        '<li><strong>Network Penetration Test</strong> &mdash; PTES methodology, host-to-network assessment</li>' +
+        '<li><strong>Quick Security Assessment</strong> &mdash; Rapid recon + port scan + vuln scan</li>' +
+        '<li><strong>SSL/TLS Security Audit</strong> &mdash; Focused certificate and cipher analysis</li>' +
+      '</ul>' +
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">How to use:</p>' +
+      '<ol style="padding-left:20px;">' +
+        '<li>Navigate to <strong>Agents &gt; Pentest</strong></li>' +
+        '<li>Click <strong>New Project</strong>, enter name + target, optionally select a template</li>' +
+        '<li>Click the project card to open the <strong>Active Engagement</strong> view</li>' +
+        '<li>Use phase tabs (Recon &rarr; Scanning &rarr; Exploitation &rarr; Reporting) to see available commands</li>' +
+        '<li>Click a command button, fill in parameters (target auto-populated from project), click <strong>Execute</strong></li>' +
+        '<li>Commands run in background &mdash; results appear automatically with parsed findings</li>' +
+        '<li>Click execution rows to see raw output in a detail modal</li>' +
+        '<li>Click <strong>Generate Report</strong> for an AI pentest report summarizing all phases and findings</li>' +
+      '</ol>' +
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">FAQ:</p>' +
+      '<p><strong>Q: What tools are required?</strong><br>A: All tools (nmap, dig, whois, openssl, nuclei, nikto, traceroute) are pre-installed in the Docker container. No additional setup needed.</p>' +
+      '<p><strong>Q: Can I browse commands without a project?</strong><br>A: Yes. The <strong>Command Library</strong> tab shows all 18 commands with phase filter and search. Click any command to see its parameters and execute it.</p>' +
+      '<p><strong>Q: How does command execution work?</strong><br>A: Commands run in the Docker container using <code style="background:var(--well);padding:1px 4px;border-radius:3px;">execFileSafe()</code> (no shell injection). Parameters are validated against a safe character regex. Output is parsed to extract findings (open ports, vulnerabilities, etc.). Results are saved to the project and appear in the phase tabs.</p>' +
+      '<p><strong>Q: Does the AI pentest report require AI?</strong><br>A: Yes. The report uses your configured AI provider to generate a professional penetration test report from project data (target, scope, commands executed, findings). Takes ~30-60 seconds. Without AI, use the raw execution data as your report basis.</p>',
 
 
     /* ===== INCIDENTS & PLAYBOOKS ===== */
@@ -688,15 +821,15 @@ Views.docs = {
 
       '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">5 Zones:</p>' +
       '<ol style="padding-left:20px;list-style:decimal;">' +
-        '<li style="margin-bottom:6px;"><strong>Stats Bar</strong> &mdash; Tools (24), Resources (6), Prompts (7), MCP Calls counter.</li>' +
+        '<li style="margin-bottom:6px;"><strong>Stats Bar</strong> &mdash; Tools (33), Resources (7), Prompts (8), MCP Calls counter.</li>' +
         '<li style="margin-bottom:6px;"><strong>AI Security Workflows</strong> &mdash; 4 clickable prompt cards: Security Audit (Multi-Tool), Threat Briefing (Daily), Incident Response (Interactive), Compliance Report (SOC2/ISO/NIST). Click to run the workflow with optional parameters. 3 additional prompts available via tool explorer: Code Security Review, WAF Reconnaissance, Anonymous Pentest Setup.</li>' +
         '<li style="margin-bottom:6px;"><strong>Live Security Data</strong> &mdash; 3 MCP resource cards showing real-time data: Security Posture (score + grade from vigil://posture), Active Threats (count + critical badge + top 3 threats from vigil://threats), Open Findings (count + severity breakdown from vigil://findings). 3 additional resources: vigil://code-audit-findings, vigil://waf-signatures, vigil://proxy-nodes.</li>' +
         '<li style="margin-bottom:6px;"><strong>Tool Explorer</strong> &mdash; Two-panel layout. Left: search bar + category tabs (Scanning/Intelligence/Compliance/Incident/System/Code Audit/Proxy/Adversarial) + tool list. Right: selected tool with description, auto-generated parameter form, Execute button, smart result rendering.</li>' +
         '<li style="margin-bottom:6px;"><strong>Request Log</strong> &mdash; Last 20 MCP calls with timestamp, status dot (cyan=success, orange=error), method, params, duration in ms.</li>' +
       '</ol>' +
 
-      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">24 MCP Tools:</p>' +
-      '<div class="code-block" style="margin-bottom:8px;font-size:11px;">check_posture         &mdash; Security posture score + breakdown\nscan_ports            &mdash; Nmap port scan (target, ports)\nscan_vulnerabilities  &mdash; Nuclei scan (target, severity)\ncheck_ssl             &mdash; SSL certificate check (domain)\nquery_logs            &mdash; Natural language log search\nosint_domain          &mdash; Domain DNS recon\nosint_ip              &mdash; IP geolocation lookup\ntriage_alert          &mdash; AI alert triage (title, details, severity)\nhunt_threat           &mdash; Threat hypothesis investigation\nrun_agent             &mdash; Execute security agent (slug, input)\nlaunch_campaign       &mdash; Multi-agent campaign (goal, maxAgents)\ngenerate_report       &mdash; Report generation (type)\ncompliance_check      &mdash; Framework compliance check\nlist_findings         &mdash; Get vulnerability findings\nincident_create       &mdash; Create security incident\nrun_code_audit        &mdash; AI code vulnerability scan (target, languages)\nget_code_audit_results&mdash; Get code audit findings (scanId)\ndetect_waf            &mdash; WAF/CDN fingerprinting (target, probeMode)\nlist_proxy_nodes      &mdash; List ephemeral proxy nodes\ncreate_proxy_node     &mdash; Create disposable Codespace proxy\nstart_proxy_tunnel    &mdash; Start SOCKS5 tunnel through proxy\nplan_proxy_infrastructure &mdash; AI proxy infrastructure planning\nvalidate_exploitability &mdash; MUST-GATE exploitability validation (Raptor)\nadversarial_analysis  &mdash; Deep adversarial security analysis (Raptor)</div>' +
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">33 MCP Tools:</p>' +
+      '<div class="code-block" style="margin-bottom:8px;font-size:11px;">check_posture         &mdash; Security posture score + breakdown\nscan_ports            &mdash; Nmap port scan (target, ports)\nscan_vulnerabilities  &mdash; Nuclei scan (target, severity)\ncheck_ssl             &mdash; SSL certificate check (domain)\nquery_logs            &mdash; Natural language log search\nosint_domain          &mdash; Domain DNS recon\nosint_ip              &mdash; IP geolocation lookup\ntriage_alert          &mdash; AI alert triage (title, details, severity)\nhunt_threat           &mdash; Threat hypothesis investigation\nrun_agent             &mdash; Execute security agent (slug, input)\nlaunch_campaign       &mdash; Multi-agent campaign (goal, maxAgents)\ngenerate_report       &mdash; Report generation (type)\ncompliance_check      &mdash; Framework compliance check\nlist_findings         &mdash; Get vulnerability findings\nincident_create       &mdash; Create security incident\nrun_code_audit        &mdash; AI code vulnerability scan (target, languages)\nget_code_audit_results&mdash; Get code audit findings (scanId)\ndetect_waf            &mdash; WAF/CDN fingerprinting (target, probeMode)\nlist_proxy_nodes      &mdash; List ephemeral proxy nodes\ncreate_proxy_node     &mdash; Create disposable Codespace proxy\nstart_proxy_tunnel    &mdash; Start SOCKS5 tunnel through proxy\nplan_proxy_infrastructure &mdash; AI proxy infrastructure planning\nvalidate_exploitability &mdash; MUST-GATE exploitability validation (Raptor)\nadversarial_analysis  &mdash; Deep adversarial security analysis (Raptor)\nrun_pentest_command   &mdash; Execute pentest command (commandId, params)\nget_pentest_results   &mdash; Get pentest project findings (projectId)\nrun_purple_team_sim   &mdash; Attack-defense gap analysis (target, scenario)\nget_purple_team_results &mdash; Get simulation results (simId)\nanalyze_binary        &mdash; Binary malware analysis (filePath, aiAnalysis)\ncreate_tunnel         &mdash; SSH tunnel (forward/reverse/dynamic)\nmanage_callback_listener &mdash; OOB callback listener (start/stop/status)\ncheck_ai_security        &mdash; AI/LLM security posture (OWASP LLM Top 10)\nautonomous_pentest       &mdash; P-E-R autonomous pentest (dual causal graph)</div>' +
 
       '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">Connecting External AI:</p>' +
       '<p>Click <strong>Connect to Claude</strong> for setup instructions:</p>' +

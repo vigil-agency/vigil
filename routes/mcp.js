@@ -1,6 +1,6 @@
 /**
  * MCP Server Route — Model Context Protocol (Streamable HTTP)
- * Vigil Security — 24 tools, 6 resources, 7 prompts
+ * Vigil Security — 33 tools, 7 resources, 8 prompts
  *
  * SDK: @modelcontextprotocol/sdk v1.x
  * Transport: Streamable HTTP (stateless, one request = one connection)
@@ -30,7 +30,7 @@ module.exports = function (app, ctx) {
     });
 
     // ════════════════════════════════════════════════════════════════════════
-    // TOOLS (22)
+    // TOOLS (31)
     // ════════════════════════════════════════════════════════════════════════
 
     // 1. check_posture
@@ -547,8 +547,247 @@ module.exports = function (app, ctx) {
       }
     });
 
+    // 25. run_pentest_command
+    server.tool('run_pentest_command', 'Execute a pentest command from the command library', {
+      commandId: z.string().describe('Command ID (e.g., host-discovery, quick-port-scan, vuln-scan)'),
+      paramsJson: z.string().default('{}').describe('Command parameters as JSON string (e.g., {"target": "192.168.1.0/24"})'),
+    }, async ({ commandId, paramsJson }) => {
+      let params = {};
+      try { params = JSON.parse(paramsJson); } catch {}
+      try {
+        const { executeCommand, COMMAND_CATALOG } = require('../lib/pentest-commands');
+        const cmd = COMMAND_CATALOG.find(c => c.id === commandId);
+        if (!cmd) return { content: [{ type: 'text', text: 'Unknown command: ' + commandId + '. Available: ' + COMMAND_CATALOG.map(c => c.id).join(', ') }], isError: true };
+        const result = await executeCommand(commandId, params, {});
+        return { content: [{ type: 'text', text: JSON.stringify({ commandName: result.commandName, tool: result.tool, duration: result.duration, summary: result.summary, findings: result.findings, code: result.code }, null, 2) }] };
+      } catch (e) {
+        return { content: [{ type: 'text', text: 'Pentest command error: ' + e.message }], isError: true };
+      }
+    });
+
+    // 26. get_pentest_results
+    server.tool('get_pentest_results', 'Get pentest project details and findings', {
+      projectId: z.string().default('latest').describe('Project ID or "latest" for most recent'),
+    }, async ({ projectId }) => {
+      try {
+        const projects = readJSON(path.join(DATA, 'pentest-projects.json'), []);
+        let project;
+        if (projectId === 'latest') {
+          project = projects[projects.length - 1];
+        } else {
+          project = projects.find(p => p.id === projectId);
+        }
+        if (!project) return { content: [{ type: 'text', text: 'No pentest project found' }] };
+        const allFindings = [];
+        const allExecs = [];
+        for (const [phase, data] of Object.entries(project.phases || {})) {
+          for (const f of (data.findings || [])) allFindings.push({ ...f, phase });
+          for (const e of (data.executions || [])) allExecs.push({ commandName: e.commandName, phase: e.phase, status: e.status, summary: e.summary, duration: e.duration });
+        }
+        return { content: [{ type: 'text', text: JSON.stringify({ id: project.id, name: project.name, target: project.target, methodology: project.methodology, status: project.status, executions: allExecs.length, findings: allFindings.length, findingsList: allFindings.slice(0, 20) }, null, 2) }] };
+      } catch (e) {
+        return { content: [{ type: 'text', text: 'Error: ' + e.message }], isError: true };
+      }
+    });
+
+    // 27. run_purple_team_sim
+    server.tool('run_purple_team_sim', 'Run a purple team attack-defense gap analysis simulation', {
+      target: z.string().describe('Target description (e.g., "e-commerce platform on AWS")'),
+      scenario: z.string().default('external-attacker').describe('Threat scenario: external-attacker, insider-threat, ransomware, apt, supply-chain'),
+      scope: z.string().default('').describe('Scope definition'),
+      defenses: z.string().default('').describe('Known defensive controls'),
+    }, async ({ target, scenario, scope, defenses }) => {
+      try {
+        if (!ctx.askAIJSON) return { content: [{ type: 'text', text: 'AI not configured' }], isError: true };
+        const { runSimulation } = require('../lib/purple-team');
+        const result = await runSimulation({ target, scope, scenario, defenses, askAIJSON: ctx.askAIJSON, timeout: 120000 });
+        return { content: [{ type: 'text', text: JSON.stringify({
+          grade: result.summary.grade, defenseScore: result.summary.defenseScore, overallRisk: result.summary.overallRisk,
+          avgDetection: result.summary.avgDetection, avgPrevention: result.summary.avgPrevention,
+          tacticsAnalyzed: result.summary.tacticsAnalyzed, riskCounts: result.summary.riskCounts,
+          attackPath: result.attackPath, criticalGaps: result.criticalGaps,
+          recommendations: (result.recommendations || []).slice(0, 5),
+          duration: result.duration,
+        }, null, 2) }] };
+      } catch (e) {
+        return { content: [{ type: 'text', text: 'Purple team error: ' + e.message }], isError: true };
+      }
+    });
+
+    // 28. get_purple_team_results
+    server.tool('get_purple_team_results', 'Get purple team simulation results', {
+      simId: z.string().default('latest').describe('Simulation ID or "latest" for most recent'),
+    }, async ({ simId }) => {
+      try {
+        const sims = readJSON(path.join(DATA, 'purple-team.json'), []);
+        let sim;
+        if (simId === 'latest') {
+          sim = sims[sims.length - 1];
+        } else {
+          sim = sims.find(s => s.id === simId);
+        }
+        if (!sim) return { content: [{ type: 'text', text: 'No purple team simulation found' }] };
+        const summary = {
+          id: sim.id, target: sim.target, scenario: sim.scenario, status: sim.status,
+          grade: sim.result?.summary?.grade, defenseScore: sim.result?.summary?.defenseScore,
+          overallRisk: sim.result?.summary?.overallRisk, duration: sim.duration,
+          criticalGaps: sim.result?.criticalGaps, attackPath: sim.result?.attackPath,
+          tacticsCount: (sim.result?.tactics || []).length,
+        };
+        return { content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }] };
+      } catch (e) {
+        return { content: [{ type: 'text', text: 'Error: ' + e.message }], isError: true };
+      }
+    });
+
+    // 29. analyze_binary
+    server.tool('analyze_binary', 'Analyze a binary file for malware indicators and security concerns', {
+      filePath: z.string().describe('Path to binary file to analyze'),
+      aiAnalysis: z.boolean().default(true).describe('Include AI threat assessment'),
+    }, async ({ filePath, aiAnalysis }) => {
+      try {
+        const { analyzeBinary } = require('../lib/binary-analysis');
+        const result = await analyzeBinary(filePath, {
+          askAI: aiAnalysis ? ctx.askAI : null,
+          timeout: 120000,
+        });
+        return { content: [{ type: 'text', text: JSON.stringify({
+          fileName: result.fileName, fileType: result.fileType, size: result.size,
+          hashes: result.hashes, entropy: result.entropy,
+          suspiciousImports: (result.suspiciousImports || []).length,
+          iocs: result.iocs, aiAnalysis: result.aiAnalysis ? result.aiAnalysis.substring(0, 2000) : null,
+        }, null, 2) }] };
+      } catch (e) {
+        return { content: [{ type: 'text', text: 'Binary analysis error: ' + e.message }], isError: true };
+      }
+    });
+
+    // 30. create_tunnel (pgrok-inspired)
+    server.tool('create_tunnel', 'Create an SSH tunnel (forward, reverse, or dynamic SOCKS5)', {
+      type: z.enum(['forward', 'reverse', 'dynamic']).describe('Tunnel type: forward (-L), reverse (-R), or dynamic (-D SOCKS5)'),
+      sshTarget: z.string().describe('SSH target (user@host)'),
+      localPort: z.number().describe('Local port number'),
+      remoteHost: z.string().default('localhost').describe('Remote host (for forward/reverse)'),
+      remotePort: z.number().default(0).describe('Remote port (for forward/reverse, defaults to localPort)'),
+    }, async ({ type, sshTarget, localPort, remoteHost, remotePort }) => {
+      try {
+        const tunnelMgr = require('../lib/tunnel-manager');
+        const tunnel = await tunnelMgr.createTunnel({
+          type, sshTarget, localPort,
+          remoteHost, remotePort: remotePort || localPort,
+        });
+        return { content: [{ type: 'text', text: JSON.stringify(tunnel, null, 2) }] };
+      } catch (e) {
+        return { content: [{ type: 'text', text: 'Tunnel error: ' + e.message }], isError: true };
+      }
+    });
+
+    // 31. manage_callback_listener (pgrok-inspired OOB detection)
+    server.tool('manage_callback_listener', 'Start/stop/status of OOB callback HTTP listener for blind vulnerability detection', {
+      action: z.enum(['start', 'stop', 'status']).describe('Action to perform'),
+      port: z.number().default(9999).describe('Port for the listener (start only)'),
+    }, async ({ action, port }) => {
+      try {
+        const tunnelMgr = require('../lib/tunnel-manager');
+        if (action === 'start') {
+          const result = tunnelMgr.startCallbackListener(port);
+          return { content: [{ type: 'text', text: `Callback listener started on port ${result.port}\nSecret: ${result.secret}\nURL: ${result.callbackURL}\n\nUse this URL in scan payloads to detect blind vulns.` }] };
+        } else if (action === 'stop') {
+          const result = tunnelMgr.stopCallbackListener();
+          return { content: [{ type: 'text', text: 'Callback listener ' + result.status }] };
+        } else {
+          const status = tunnelMgr.getCallbackStatus();
+          return { content: [{ type: 'text', text: JSON.stringify(status, null, 2) }] };
+        }
+      } catch (e) {
+        return { content: [{ type: 'text', text: 'Callback error: ' + e.message }], isError: true };
+      }
+    });
+
+    // 32. check_ai_security (awesome-ai-security inspired)
+    server.tool('check_ai_security', 'Assess AI/LLM security posture against OWASP LLM Top 10 and MITRE ATLAS frameworks', {
+      target: z.string().describe('Description of the AI/LLM system to assess'),
+      depth: z.enum(['quick', 'standard', 'deep']).default('standard').describe('Assessment depth'),
+    }, async ({ target, depth }) => {
+      try {
+        const kb = require('../lib/ai-security-kb');
+        const stats = kb.getKBStats();
+        const owasp = kb.getOWASPLLMTop10();
+        const atlas = kb.getATLASTechniques();
+
+        const owaspRef = owasp.map(e => `${e.id} ${e.name} (${e.severity}): ${e.description.substring(0, 100)}...`).join('\n');
+        const atlasRef = atlas.slice(0, 8).map(e => `${e.id} ${e.name}: ${e.description.substring(0, 80)}...`).join('\n');
+
+        const prompt = `You are an AI security assessor. Evaluate this system against OWASP LLM Top 10 and MITRE ATLAS.
+
+System: ${target}
+Depth: ${depth}
+
+OWASP LLM Top 10 Reference:
+${owaspRef}
+
+MITRE ATLAS Techniques:
+${atlasRef}
+
+${depth === 'quick' ? 'Provide a brief assessment: top 3 risks, overall grade (A-F), and key action items.' :
+  depth === 'deep' ? 'Provide exhaustive analysis: all 10 OWASP entries, applicable ATLAS techniques, prompt injection vectors (8 types), agent security, MCP risks, supply chain. Include risk matrix and remediation roadmap.' :
+  'Assess each applicable OWASP LLM entry, top ATLAS techniques, and provide: findings, risk ratings, mitigations, and overall AI security grade (A-F).'}
+
+Respond with valid JSON:
+{
+  "grade": "A-F",
+  "score": 0-100,
+  "findings": [{"id": "LLM01", "risk": "critical|high|medium|low", "applicable": true, "detail": "...", "mitigation": "..."}],
+  "topRisks": ["risk1", "risk2", "risk3"],
+  "recommendations": ["action1", "action2", "action3"],
+  "summary": "1-2 sentence executive summary"
+}`;
+
+        if (ctx.askAIJSON) {
+          const result = await ctx.askAIJSON(prompt, { timeout: 120000 });
+          return { content: [{ type: 'text', text: JSON.stringify(result || { error: 'No AI response' }, null, 2) }] };
+        }
+        // Fallback without AI
+        return { content: [{ type: 'text', text: JSON.stringify({
+          grade: 'N/A', score: 0, summary: 'AI provider not configured — cannot perform assessment',
+          kbStats: stats, owaspEntries: owasp.map(e => ({ id: e.id, name: e.name, severity: e.severity })),
+        }, null, 2) }] };
+      } catch (e) {
+        return { content: [{ type: 'text', text: 'AI security check error: ' + e.message }], isError: true };
+      }
+    });
+
+    // 33. autonomous_pentest (LuaN1aoAgent-inspired P-E-R engine)
+    server.tool('autonomous_pentest', 'Run autonomous P-E-R (Planner-Executor-Reflector) pentest with dual causal graph reasoning', {
+      target: z.string().describe('Target URL, hostname, or IP address'),
+      scope: z.string().default('').describe('Scope constraints (allowed domains, IP ranges, exclusions)'),
+      depth: z.enum(['quick', 'standard', 'deep']).default('standard').describe('Assessment depth: quick (3 cycles), standard (5), deep (8)'),
+    }, async ({ target, scope, depth }) => {
+      try {
+        if (!/^[a-zA-Z0-9.\-:\/]+$/.test(target)) return { content: [{ type: 'text', text: 'Invalid target format' }], isError: true };
+
+        const { createPEREngine } = require('../lib/per-engine');
+        const engine = createPEREngine({
+          target, scope, depth,
+          askAI: ctx.askAI, askAIJSON: ctx.askAIJSON,
+          execFileSafe: ctx.execFileSafe, execCommand: ctx.execCommand,
+        });
+
+        const results = await engine.run();
+        return { content: [{ type: 'text', text: JSON.stringify({
+          id: results.id, target: results.target, state: results.state,
+          cycles: results.cycle, maxCycles: results.maxCycles,
+          findings: results.findings, report: results.report,
+          taskStats: results.taskGraph.stats, causalStats: results.causalGraph.stats,
+          timeline: results.timeline.slice(-10),
+        }, null, 2) }] };
+      } catch (e) {
+        return { content: [{ type: 'text', text: 'P-E-R engine error: ' + e.message }], isError: true };
+      }
+    });
+
     // ════════════════════════════════════════════════════════════════════════
-    // RESOURCES (6)
+    // RESOURCES (7)
     // ════════════════════════════════════════════════════════════════════════
 
     server.resource('posture', 'vigil://posture', { description: 'Current security posture overview' },
@@ -619,8 +858,16 @@ module.exports = function (app, ctx) {
       }
     );
 
+    server.resource('ai-security-kb', 'vigil://ai-security-kb', { description: 'AI Security Knowledge Base — OWASP LLM Top 10, MITRE ATLAS, prompt injection patterns' },
+      async (uri) => {
+        const kb = require('../lib/ai-security-kb');
+        const data = { stats: kb.getKBStats(), owasp: kb.getOWASPLLMTop10().map(e => ({ id: e.id, name: e.name, severity: e.severity })), atlas: kb.getATLASTechniques().map(e => ({ id: e.id, name: e.name, tactic: e.tactic })), injections: kb.getPromptInjections().map(e => ({ id: e.id, name: e.name, technique: e.technique, severity: e.severity })), vulnTypes: kb.getAIVulnTypes().map(e => ({ id: e.id, name: e.name, severity: e.severity })) };
+        return { contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(data, null, 2) }] };
+      }
+    );
+
     // ════════════════════════════════════════════════════════════════════════
-    // PROMPTS (7)
+    // PROMPTS (8)
     // ════════════════════════════════════════════════════════════════════════
 
     server.prompt('security_audit', 'Full security assessment of the system', {},
@@ -683,6 +930,15 @@ module.exports = function (app, ctx) {
       messages: [{
         role: 'user',
         content: { type: 'text', text: `Plan anonymous scanning infrastructure for: "${engagement}". Use plan_proxy_infrastructure for AI recommendations. Check vigil://proxy-nodes for existing nodes. Use list_proxy_nodes to see current status. If nodes are needed, use create_proxy_node and start_proxy_tunnel. Provide a complete infrastructure setup plan with OPSEC considerations.` },
+      }],
+    }));
+
+    server.prompt('ai_security_review', 'AI/LLM security posture assessment against OWASP LLM Top 10', {
+      system: z.string().describe('Description of the AI/LLM system to assess'),
+    }, ({ system }) => ({
+      messages: [{
+        role: 'user',
+        content: { type: 'text', text: `Perform a comprehensive AI security review of: "${system}". Read vigil://ai-security-kb for the full knowledge base. Use check_ai_security for automated assessment. Map findings to OWASP LLM Top 10 (LLM01-LLM10) and MITRE ATLAS techniques. Assess prompt injection vectors, data leakage risks, excessive agency, supply chain security, and MCP tool safety. Provide a security grade (A-F), prioritized findings, and actionable remediation plan.` },
       }],
     }));
 
@@ -764,9 +1020,9 @@ module.exports = function (app, ctx) {
       url: mcpUrl,
       transport: 'streamable-http',
       version: '1.0.0',
-      tools: 24,
-      resources: 6,
-      prompts: 7,
+      tools: 33,
+      resources: 7,
+      prompts: 8,
       instructions: {
         claudeDesktop: {
           config: {

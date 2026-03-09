@@ -179,34 +179,7 @@ Return only valid JSON, no markdown.`;
     }
   });
 
-  // ════════════════════════════════════════════════════════════════════════
-  // PENTEST — /api/pentest
-  // ════════════════════════════════════════════════════════════════════════
-  const PENTEST_PATH = path.join(DATA, 'pentest-projects.json');
-
-  app.get('/api/pentest', requireAuth, (req, res) => {
-    const projects = readJSON(PENTEST_PATH, []);
-    res.json({ projects });
-  });
-
-  app.post('/api/pentest', requireRole('analyst'), (req, res) => {
-    const { name, target, scope, methodology } = req.body;
-    if (!name) return res.status(400).json({ error: 'name required' });
-
-    const projects = readJSON(PENTEST_PATH, []);
-    const project = {
-      id: crypto.randomUUID(),
-      name, target: target || '', scope: scope || '',
-      methodology: methodology || 'OWASP',
-      status: 'planning',
-      findings: [],
-      createdAt: new Date().toISOString(),
-      createdBy: req.user ? req.user.username : 'unknown',
-    };
-    projects.push(project);
-    writeJSON(PENTEST_PATH, projects);
-    res.json(project);
-  });
+  // Pentest endpoints moved to routes/pentest.js (Reconmap-inspired command library)
 
   // ════════════════════════════════════════════════════════════════════════
   // SETTINGS EXTRAS — /api/settings/ai/test

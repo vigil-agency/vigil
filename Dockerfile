@@ -7,7 +7,7 @@ ENV NODE_ENV=production
 # System packages + security scanners
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl gnupg ca-certificates unzip git openssh-client bash \
-    python3 make g++ \
+    python3 make g++ file \
     procps htop net-tools iproute2 lsb-release \
     nmap nikto dnsutils whois \
     openssl libssl-dev \

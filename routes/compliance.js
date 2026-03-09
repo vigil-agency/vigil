@@ -1,5 +1,5 @@
 /**
- * Compliance Routes — SOC 2, ISO 27001, NIST 800-53 framework checks
+ * Compliance Routes — SOC 2, ISO 27001, NIST 800-53, OWASP LLM Top 10 framework checks
  */
 const fs = require('fs');
 const path = require('path');
@@ -84,6 +84,11 @@ const FRAMEWORKS = {
       { id: 'SC-8', name: 'Transmission Confidentiality', category: 'SC', check: 'encryption', description: 'The system protects the confidentiality of transmitted information' },
       { id: 'SI-2', name: 'Flaw Remediation', category: 'SI', check: 'risk_mitigation', description: 'The organization identifies, reports, and corrects system flaws' },
     ],
+  },
+  'owasp-llm': {
+    name: 'OWASP LLM Top 10 (2025)',
+    description: 'Top 10 security risks for Large Language Model applications — prompt injection, data leakage, excessive agency, and more',
+    controls: require('../lib/ai-security-kb').getOWASPLLMControls(),
   },
 };
 
@@ -209,6 +214,58 @@ module.exports = function (app, ctx) {
         } catch { return { status: 'partial', detail: 'Secure coding check inconclusive' }; }
       }
 
+      // ── AI / LLM Security Controls (OWASP LLM Top 10) ──
+      case 'ai_llm01': { // Prompt Injection
+        const settings = readJSON(path.join(DATA, 'settings.json'), {});
+        return settings.aiProvider
+          ? { status: 'partial', detail: 'AI provider configured — verify prompt injection defenses: input validation, instruction hierarchy enforcement, output filtering' }
+          : { status: 'pass', detail: 'No AI provider configured — LLM prompt injection risk is minimal' };
+      }
+      case 'ai_llm02': { // Sensitive Information Disclosure
+        const settings = readJSON(path.join(DATA, 'settings.json'), {});
+        return settings.aiProvider
+          ? { status: 'partial', detail: 'AI provider active — review system prompts for embedded secrets, verify PII filtering on LLM inputs/outputs' }
+          : { status: 'pass', detail: 'No AI provider — sensitive data disclosure via LLM not applicable' };
+      }
+      case 'ai_llm03': { // Supply Chain
+        const lockExists = fs.existsSync(path.join(__dirname, '..', 'package-lock.json'));
+        return lockExists
+          ? { status: 'partial', detail: 'Dependency lock file present — additionally verify AI model provenance and scan model files with modelscan/picklescan' }
+          : { status: 'fail', detail: 'No lock file — AI supply chain controls inadequate' };
+      }
+      case 'ai_llm04': { // Data and Model Poisoning
+        return { status: 'partial', detail: 'Verify training data integrity, implement data provenance tracking, and test for adversarial robustness' };
+      }
+      case 'ai_llm05': { // Improper Output Handling
+        try {
+          const r = await execCommand("grep -rc 'escapeHtml\\|textContent\\|sanitize' /app/public/js/ 2>/dev/null | tail -1", { timeout: 3000 });
+          const count = parseInt(r.stdout.trim()) || 0;
+          return count > 5
+            ? { status: 'pass', detail: `Output sanitization detected — ${count} escapeHtml/textContent references in frontend` }
+            : { status: 'partial', detail: 'Verify LLM outputs are sanitized before rendering — check for XSS via model-generated content' };
+        } catch { return { status: 'partial', detail: 'Verify LLM output handling — apply encoding and sanitization to all model-generated content' }; }
+      }
+      case 'ai_llm06': { // Excessive Agency
+        const settings = readJSON(path.join(DATA, 'settings.json'), {});
+        if (!settings.aiProvider) return { status: 'pass', detail: 'No AI provider — excessive agency risk not applicable' };
+        return { status: 'partial', detail: 'AI agents active — verify least-privilege tool permissions, human-in-the-loop for destructive actions, and rate limiting on agent operations' };
+      }
+      case 'ai_llm07': { // System Prompt Leakage
+        return { status: 'partial', detail: 'Review system prompts for embedded credentials or sensitive business logic — implement prompt leakage detection in output filtering' };
+      }
+      case 'ai_llm08': { // Vector and Embedding Weaknesses
+        return { status: 'na', detail: 'RAG/vector store not detected — verify if embedding systems are in use and apply access controls' };
+      }
+      case 'ai_llm09': { // Misinformation
+        return { status: 'partial', detail: 'Implement confidence scoring on AI outputs, cross-reference with authoritative sources, require human review for security-critical AI decisions' };
+      }
+      case 'ai_llm10': { // Unbounded Consumption
+        const settings = readJSON(path.join(DATA, 'settings.json'), {});
+        return settings.aiProvider
+          ? { status: 'partial', detail: 'AI provider active — verify token budgets, request timeouts, rate limiting, and agent loop detection are configured' }
+          : { status: 'pass', detail: 'No AI provider — unbounded consumption risk not applicable' };
+      }
+
       default:
         return { status: 'na', detail: 'Check type not automated — requires manual assessment' };
     }
@@ -248,7 +305,7 @@ module.exports = function (app, ctx) {
   app.get('/api/compliance/:framework', requireAuth, async (req, res) => {
     try {
       const framework = FRAMEWORKS[req.params.framework];
-      if (!framework) return res.status(404).json({ error: 'Framework not found. Available: soc2, iso27001, nist800-53' });
+      if (!framework) return res.status(404).json({ error: 'Framework not found. Available: soc2, iso27001, nist800-53, owasp-llm' });
 
       const controls = [];
       let pass = 0, fail = 0, partial = 0, na = 0;

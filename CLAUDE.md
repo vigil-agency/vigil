@@ -80,14 +80,14 @@ incidents.js           -> Incident response workflow, timeline, postmortem
 assets.js              -> Asset inventory, network map, service catalog
 policies.js            -> Security policy management, enforcement
 threats.js             -> Threat intelligence feeds, IOC matching
-pentest.js             -> Penetration test project management, findings
+pentest.js             -> Pentest command library + engagement management (Reconmap-inspired)
 credentials.js         -> AES-256-GCM credential vault
 notifications.js       -> Notification system (email, webhook, Slack)
 settings.js            -> Platform configuration, user preferences
-mcp.js                 -> MCP server (Streamable HTTP, 25+ tools, resources, prompts)
+mcp.js                 -> MCP server (Streamable HTTP, 33 tools, 7 resources, 8 prompts)
 health.js              -> Health check endpoint, service status
-code-audit.js          -> LLM-driven source code vulnerability scanning (Vulnhuntr-inspired)
-ephemeral-infra.js     -> Disposable proxy node management (fluffy-barnacle-inspired)
+code-audit.js          -> LLM-driven source code vulnerability scanning + binary analysis routes
+ephemeral-infra.js     -> Disposable proxy nodes + SSH tunnels + OOB callback listener (fluffy-barnacle + pgrok inspired)
 intel-hub.js           -> Intel Hub (RSS feeds, CVE Watch, CISA KEV, AI Briefings)
 ```
 
@@ -112,9 +112,15 @@ notification-sender.js -> Push notifications via Socket.IO
 neural-cache.js        -> Intelligent caching layer
 code-audit.js          -> LLM-driven code vulnerability scanner (7 vuln types, confidence scoring)
 ephemeral-proxy.js     -> Disposable Codespace proxy management (SOCKS5 tunnels, lifecycle)
+tunnel-manager.js      -> SSH tunnel lifecycle (forward/reverse/dynamic) + OOB callback HTTP listener (pgrok-inspired)
 web-recon.js           -> Scrapy-inspired web crawler (surface scan, exposed files, tech fingerprint)
 ghost-osint.js         -> Username enumeration (26 platforms) + phone number intelligence (70+ countries)
 raptor-engine.js       -> Adversarial analysis engine (MUST-GATE reasoning, 4-step exploitability validation)
+binary-analysis.js     -> Lightweight binary inspection (file, strings, readelf, objdump) + AI threat assessment
+pentest-commands.js    -> Parameterized command catalog (18 commands, 4 templates) + execution engine
+purple-team.js         -> MITRE ATT&CK kill chain simulator (14 tactics, 5 scenarios, gap analysis)
+ai-security-kb.js      -> AI Security Knowledge Base (OWASP LLM Top 10, MITRE ATLAS, injection patterns, defensive tools)
+per-engine.js          -> P-E-R Engine: Planner-Executor-Reflector cycle + dual causal graph (LuaN1aoAgent-inspired)
 intel-feeds.js         -> RSS/Atom feed parser (15 feeds), CISA KEV, NVD CVE API, AI briefings
 ```
 
@@ -143,21 +149,21 @@ public/
 | View | File | Description |
 |------|------|-------------|
 | Dashboard | `views/dashboard.js` | Security posture score, active threats, recent scans |
-| Intel Hub | `views/knowledge.js` | RSS feeds, CVE Watch, CISA KEV, AI Briefings (4 tabs) |
+| Intel Hub | `views/knowledge.js` | RSS feeds, CVE Watch, CISA KEV, AI Briefings, AI Threats (5 tabs) |
 
 ### AI & Intel
 | View | File | Description |
 |------|------|-------------|
 | AI Terminal | `views/ai-terminal.js` | Claude CLI terminal for AI-powered security analysis |
 | AI Chat | `views/ai-chat.js` | Conversational AI security assistant |
-| MCP Playground | `views/mcp.js` | MCP tool testing, prompt library, 9 category tabs |
+| MCP Playground | `views/mcp.js` | MCP tool testing, prompt library, 12 category tabs |
 
 ### Agents
 | View | File | Description |
 |------|------|-------------|
-| Security Agents | `views/agents.js` | 24 security agents with "Try:" example buttons |
-| Campaigns | `views/campaigns.js` | Multi-agent campaign orchestration |
-| Pentest | `views/pentest.js` | Pentest project management, findings, evidence |
+| Security Agents | `views/agents.js` | 27 security agents with "Try:" example buttons |
+| Campaigns | `views/campaigns.js` | Multi-agent campaigns + Purple Team Simulator (Decepticon-inspired) |
+| Pentest | `views/pentest.js` | Pentest command library, engagement phases, AI reports, Autonomous P-E-R tab (Reconmap + LuaN1aoAgent) |
 | Playbooks | `views/playbooks.js` | Incident response playbook management |
 
 ### Workspace (third sidebar group)
@@ -184,8 +190,8 @@ public/
 | Container Security | `views/container-scan.js` | Trivy image/filesystem scanning, SBOM generation |
 | SSL Monitor | `views/ssl-audit.js` | OpenSSL certificate chain analysis, cipher suite grading |
 | DNS Security | `views/dns-security.js` | DNS security analysis, DNSSEC validation |
-| Code Audit | `views/code-audit.js` | LLM-driven source code vulnerability scanning |
-| Proxy Nodes | `views/proxy-nodes.js` | Disposable Codespace proxies for anonymous scanning |
+| Code Audit | `views/code-audit.js` | LLM-driven source code vulnerability scanning + Binary Analysis tab |
+| Proxy Nodes | `views/proxy-nodes.js` | Codespace proxies + SSH Tunnels + OOB Callback Listener (3 tabs) |
 
 ### Intelligence
 | View | File | Description |
@@ -197,7 +203,7 @@ public/
 ### Compliance
 | View | File | Description |
 |------|------|-------------|
-| Frameworks | `views/compliance.js` | SOC2, PCI-DSS, HIPAA, ISO27001, NIST |
+| Frameworks | `views/compliance.js` | SOC2, ISO27001, NIST, OWASP LLM Top 10 (4 tabs) |
 | Reports | `views/reports.js` | Report generation (PDF/JSON/CSV), scheduling |
 | Audit Log | `views/audit-log.js` | Immutable audit trail, filtering, export |
 
@@ -221,7 +227,7 @@ public/
 - Each customer's MCP server is isolated in their own container sandbox -- tenant-scoped, auth-gated.
 - SDK: `@modelcontextprotocol/sdk` + Zod schemas
 
-### Tools (24) — actual names from routes/mcp.js
+### Tools (33) — actual names from routes/mcp.js
 ```
 # System & Posture
 check_posture            -> Security posture score + grade breakdown
@@ -266,6 +272,27 @@ plan_proxy_infrastructure -> AI proxy infrastructure planning
 # Adversarial (Raptor-inspired)
 validate_exploitability  -> 4-step MUST-GATE exploitability validation
 adversarial_analysis     -> Deep adversarial security analysis with reasoning constraints
+
+# Pentest (Reconmap-inspired)
+run_pentest_command      -> Execute pentest command from library (commandId, params)
+get_pentest_results      -> Get pentest project details and findings (projectId or "latest")
+
+# Purple Team (Decepticon-inspired)
+run_purple_team_sim      -> Run attack-defense gap analysis simulation (target, scenario)
+get_purple_team_results  -> Get purple team simulation results (simId or "latest")
+
+# Binary Analysis
+analyze_binary           -> Analyze binary file for malware indicators (filePath, aiAnalysis)
+
+# SSH Tunnels & Callback (pgrok-inspired)
+create_tunnel            -> Create SSH tunnel (forward/reverse/dynamic, sshTarget, ports)
+manage_callback_listener -> Start/stop/status OOB callback listener for blind vuln detection
+
+# AI Security (awesome-ai-security inspired)
+check_ai_security        -> AI/LLM security posture assessment (OWASP LLM Top 10, MITRE ATLAS)
+
+# Autonomous Pentest (LuaN1aoAgent-inspired)
+autonomous_pentest       -> P-E-R autonomous pentest with dual causal graph reasoning
 ```
 
 ### Resources
@@ -275,6 +302,7 @@ adversarial_analysis     -> Deep adversarial security analysis with reasoning co
 - `vigil://code-audit-findings` -- Code audit vulnerability findings
 - `vigil://waf-signatures` -- WAF detection signature database (30+)
 - `vigil://proxy-nodes` -- Ephemeral proxy node status
+- `vigil://ai-security-kb` -- AI Security Knowledge Base (OWASP LLM Top 10, MITRE ATLAS, injection patterns)
 
 ### Prompts
 - `security_audit` -- Full security audit report generation
@@ -284,10 +312,11 @@ adversarial_analysis     -> Deep adversarial security analysis with reasoning co
 - `code_security_review` -- AI-powered source code security review
 - `waf_reconnaissance` -- WAF detection and bypass analysis
 - `anonymous_pentest_setup` -- Plan and provision anonymous scanning infra
+- `ai_security_review` -- AI/LLM security posture assessment (OWASP LLM Top 10)
 
 ### GUI Test Endpoint
 - `POST /api/mcp/test` uses InMemoryTransport (bypasses HTTP handshake, 5min tool timeout)
-- GUI playground: search bar + 9 category tabs (All/Scanning/Intelligence/Compliance/Incident/System/Code Audit/Proxy/Adversarial), schema-driven param forms, 4 prompt workflow cards, request log
+- GUI playground: search bar + 12 category tabs (All/Scanning/Intelligence/Compliance/Incident/System/Code Audit/Proxy/Adversarial/Pentest/Purple Team/AI Security), schema-driven param forms, 4 prompt workflow cards, request log
 - MCP tools that need AI have 120s internal timeout; MCP client timeout is 300s to accommodate
 
 ## ViewRegistry Pattern
@@ -363,6 +392,8 @@ Modal.close();
 | `scan_complete` | `{ scanId, type, results, summary }` | on scan finish |
 | `code_audit_progress` | `{ scanId, phase, message }` | during code audit |
 | `proxy_node_update` | `{ action, name, node? }` | on proxy node change |
+| `tunnel_update` | `{ action, tunnel?, id? }` | on tunnel create/stop |
+| `callback_update` | `{ action, port? }` | on callback listener start |
 | `recon_progress` | `{ scanId, phase, url? }` | during web recon crawl |
 | `recon_complete` | `{ scanId, spiderType, target, summary }` | on recon finish |
 | `alert` | `{ id, severity, message, source, ts }` | on trigger |
@@ -470,6 +501,43 @@ Users bring their own AI subscriptions. The app shells out to locally-installed 
 - API: `POST /api/code-audit`, `GET /api/code-audit/:id`, `POST /api/code-audit/preview`
 - Exploitability validation: `POST /api/code-audit/:id/validate/:findingIdx` (Raptor 4-step analysis)
 
+### Purple Team Simulator (Decepticon-inspired)
+- AI-driven attack-defense gap analysis through MITRE ATT&CK kill chain
+- 14 ATT&CK tactics (TA0043-TA0040), 10 analyzed per simulation
+- 5 threat scenarios: External Attacker, Insider Threat, Ransomware, APT, Supply Chain
+- Per-tactic output: attack technique, scenario, likelihood, detection %, prevention %, controls, gaps
+- Aggregate: Defense Grade (A-F), Defense Score, Overall Risk, coverage heatmap
+- Produces: critical gaps list, prioritized recommendations with impact/effort
+- No actual attacks — AI reasoning-only simulation
+- API: `GET /api/campaigns/purple-team/scenarios`, `POST /api/campaigns/purple-team`, `GET /api/campaigns/purple-team/:id`
+- Socket.IO events: `purple_team_progress`, `purple_team_complete`
+- Lib: `lib/purple-team.js`, Routes: added to `routes/campaigns.js`
+- Frontend: "Purple Team" tab in Campaigns view with ATT&CK heatmap + tactic detail modals
+
+### Pentest Command Library (Reconmap-inspired)
+- 18 pre-built parameterized security commands across 4 engagement phases
+- Recon (5): Host Discovery, DNS Lookup, WHOIS, Reverse DNS, SSL Certificate, Traceroute
+- Scanning (7): Quick/Full Port Scan, Vuln Scan, Web Server Scan, SSL Audit, DNS Zone Transfer, OS Detection, Script Scan
+- Exploitation (4): Banner Grab, HTTP Methods, Default Creds, NSE Vuln Scripts
+- 4 engagement templates: Web App (OWASP), Network (PTES), Quick Assessment, SSL Audit
+- Parameter validation via safe char regex, `execFileSafe()` execution (no shell injection)
+- Output parsers: nmap-hosts, nmap-ports, nuclei-jsonl, nikto, raw
+- AI pentest report generation from project data (scope, methodology, commands, findings)
+- API: `GET /api/pentest/commands`, `POST /api/pentest`, `GET /api/pentest/:id`, `POST /api/pentest/:id/exec`, `POST /api/pentest/:id/report`
+- Socket.IO events: `pentest_progress`, `pentest_exec_complete`
+- Lib: `lib/pentest-commands.js`, Routes: `routes/pentest.js` (standalone, moved from extras.js)
+
+### Binary Analysis (integrated in Code Audit view)
+- Lightweight binary inspection using `file`, `strings`, `readelf`, `objdump` (no Ghidra/Java)
+- Extracts: file type, hashes (MD5/SHA1/SHA256), Shannon entropy, IOCs (URLs, IPs, emails, domains, CVEs)
+- 60+ suspicious import detection (process injection, anti-debug, crypto, persistence, network APIs)
+- ELF/PE structure: section headers, dynamic symbols, shared libraries, imports/exports
+- AI threat assessment: LLM produces malware analysis report with MITRE ATT&CK mapping
+- Max file size: 50MB
+- API: `POST /api/code-audit/binary`, `GET /api/code-audit/binary/:id`
+- Frontend: "Binary Analysis" tab in Code Audit view, results in Findings view (type='binary-analysis')
+- Lib: `lib/binary-analysis.js` (exports: analyzeBinary, detectFileType, extractStrings, analyzeELF, analyzePE, computeEntropy, computeHashes, flagSuspiciousImports)
+
 ### Raptor Engine (Adversarial Analysis)
 - MUST-GATE reasoning framework: 7 forced constraints (ASSUME-EXPLOIT, STRICT-SEQUENCE, CHECKLIST, NO-HEDGING, FULL-COVERAGE, PROOF, CONSISTENCY)
 - 4-step exploitability validation: Source Control → Sanitizer Effectiveness → Reachability → Impact Assessment
@@ -485,7 +553,7 @@ Users bring their own AI subscriptions. The app shells out to locally-installed 
 2. **Sidebar > Scanning > Code Audit**: Run a code audit, then expand any finding row and click the "Validate Exploitability" button to run 4-step MUST-GATE analysis. Shows pass/fail per step with EXPLOITABLE/FALSE_POSITIVE verdict.
 3. **Sidebar > System > MCP Server > Adversarial tab**: Test `validate_exploitability` or `adversarial_analysis` tools directly. Also available to any MCP-connected AI (Claude Desktop: `claude mcp add vigil --transport http http://localhost:4100/mcp`).
 
-### Proxy Nodes (fluffy-barnacle-inspired)
+### Proxy Nodes (fluffy-barnacle + pgrok inspired)
 - GitHub Codespaces as disposable SOCKS5 proxy nodes for anonymous scanning
 - Full lifecycle: create, start, stop, delete Codespaces via `gh` CLI
 - SSH dynamic port forwarding (`gh codespace ssh -D`) for SOCKS5 proxy
@@ -493,6 +561,58 @@ Users bring their own AI subscriptions. The app shells out to locally-installed 
 - AI infrastructure planner for engagement-based proxy recommendations
 - Requires `gh` CLI installed and authenticated; graceful degradation when absent
 - API: `GET /api/proxy-nodes`, `POST /api/proxy-nodes`, `POST /api/proxy-nodes/ai-plan`
+
+### SSH Tunnels (pgrok-inspired)
+- 3 tunnel types: Forward (-L local→remote), Reverse (-R remote←local), Dynamic (-D SOCKS5)
+- Auto-reconnect with exponential backoff (2s → 4s → 8s → 16s max, reset after 60s stable)
+- SSH keepalive (`ServerAliveInterval=15`), `ExitOnForwardFailure=yes`, strict host key disabled
+- Health check via port listening verification
+- Data persisted to `data/tunnels.json`, process cleanup on exit
+- API: `GET/POST /api/proxy-nodes/tunnels`, `DELETE /api/proxy-nodes/tunnels/:id`, `POST /api/proxy-nodes/tunnels/:id/health`
+- MCP tool: `create_tunnel` (type, sshTarget, localPort, remoteHost, remotePort)
+
+### OOB Callback Listener (pgrok-inspired)
+- Built-in HTTP server captures all incoming requests for blind vulnerability detection
+- Replaces need for external services like interactsh/Burp Collaborator
+- Secret-based targeting: generates unique token in URL path; requests matching secret are flagged as targeted callbacks
+- Captures: method, URL, headers, body, source IP, user agent, content type
+- Data persisted to `data/callback-log.json` (max 500 entries), auto-cleanup
+- API: `GET/POST /api/proxy-nodes/callback`, `GET/DELETE /api/proxy-nodes/callback/log`
+- MCP tool: `manage_callback_listener` (action: start/stop/status, port)
+- Frontend: "Callback Listener" tab in Proxy Nodes view with status panel, captured requests table, detail modal
+
+### AI Security Knowledge Base (awesome-ai-security inspired)
+- In-memory knowledge base of AI/ML security threats, frameworks, and defenses
+- OWASP LLM Top 10 (2025): 10 entries with descriptions, attack examples, mitigations, CWE references
+- MITRE ATLAS: 15 adversarial ML techniques with detection/mitigation guidance
+- Prompt injection patterns: 8 types (direct, indirect, encoding, role-play, RAG, MCP, multi-turn, splitting)
+- AI vulnerability types: 8 classes (model theft, data extraction, adversarial examples, agent manipulation, MCP compromise)
+- Defensive tools reference: 12 tools (guardrails, scanners, red-team, detection)
+- Compliance: OWASP LLM as 4th framework in Compliance view (alongside SOC2, ISO27001, NIST)
+- Intel Hub: "AI Threats" tab with 5 sub-categories, detail modals, AI analysis
+- MCP: `check_ai_security` tool, `vigil://ai-security-kb` resource, `ai_security_review` prompt
+- Agents: `ai-threat-analyst` (maps to OWASP/ATLAS) and `prompt-injection-tester` (8 PI vectors)
+- API: `GET /api/intel/ai-threats`, `POST /api/intel/ai-threats/analyze`
+- Neural cache: `ai-kb:all` key with 10min TTL (static KB data)
+- Lib: `lib/ai-security-kb.js`, Routes: modifications to intel-hub.js, compliance.js, agents.js, mcp.js
+
+### P-E-R Engine (LuaN1aoAgent-inspired Autonomous Pentest)
+- Planner-Executor-Reflector cycle for autonomous penetration testing
+- Dual causal graph: Task Graph (DAG of subtasks with dependencies) + Causal Graph (evidence chain)
+- Causal chain: Evidence -> Hypothesis -> Possible Vulnerability -> Confirmed Vulnerability
+- L0-L5 failure attribution: L0=raw, L1=tool failure, L2=prerequisite, L3=environmental, L4=hypothesis falsified, L5=strategy flawed
+- Non-monotonic confidence propagation: logit/sigmoid updates, necessary vs contingent evidence
+- Staged node review: Executor proposes causal nodes, Reflector validates before committing
+- Depth modes: quick (3 cycles), standard (5 cycles), deep (8 cycles)
+- Tools: nmap, nuclei, nikto, dig, whois, openssl, curl (validated via execFileSafe)
+- AI-driven: Planner decomposes target, Executor analyzes output, Reflector audits, Replanner adapts
+- Results persisted to `data/per-results.json`, cached in neural cache (10min TTL)
+- Socket.IO events: `per_progress` (phase updates), `per_complete`, `per_error`
+- API: `POST /api/pentest/autonomous`, `GET /api/pentest/autonomous`, `GET /api/pentest/autonomous/:id`, `POST /api/pentest/autonomous/:id/halt`
+- MCP tool: `autonomous_pentest` (target, scope, depth)
+- Agent: `autonomous-pentester` with 3 example prompts
+- Frontend: "Autonomous" tab in Pentest view with launch modal, live progress, detail modal with task/causal graph visualization
+- Lib: `lib/per-engine.js` (exports: createPEREngine, PEREngine, TaskGraph, CausalGraph, constants)
 
 ### Web Recon (Scrapy + Scrapling inspired)
 - Lightweight Node.js web crawler in `lib/web-recon.js` (Scrapy Spider→Pipeline architecture)

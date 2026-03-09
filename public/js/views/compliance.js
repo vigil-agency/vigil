@@ -14,6 +14,7 @@ Views.compliance = {
         '<div class="tab-item active" data-fw="soc2">SOC 2</div>' +
         '<div class="tab-item" data-fw="iso27001">ISO 27001</div>' +
         '<div class="tab-item" data-fw="nist800-53">NIST 800-53</div>' +
+        '<div class="tab-item" data-fw="owasp-llm">OWASP LLM</div>' +
       '</div>' +
 
       '<div id="compliance-score-section" class="stat-grid" style="margin-bottom:20px;">' +

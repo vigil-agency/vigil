@@ -42,6 +42,7 @@ Views.findings = {
           '<option value="zap">ZAP</option>' +
           '<option value="trivy">Trivy</option>' +
           '<option value="code-audit">Code Audit</option>' +
+          '<option value="binary-analysis">Binary Analysis</option>' +
           '<option value="waf">WAF Detection</option>' +
         '</select>' +
         '<input type="text" class="form-input" id="findings-search" placeholder="Search findings..." style="max-width:200px;">' +

@@ -1,8 +1,9 @@
 'use strict';
 /**
- * Intel Hub — Security feed aggregation, CVE watch, AI briefings, CISA KEV
+ * Intel Hub — Security feed aggregation, CVE watch, AI briefings, CISA KEV, AI Threats KB
  */
 const intel = require('../lib/intel-feeds');
+const aiKB = require('../lib/ai-security-kb');
 
 module.exports = function(app, ctx) {
   const { requireAuth, requireRole, askAI } = ctx;
@@ -136,5 +137,52 @@ module.exports = function(app, ctx) {
       return { key: entry[0], name: entry[1].name, category: entry[1].category };
     });
     res.json({ sources });
+  });
+
+  /* ── AI Security Threats Knowledge Base ── */
+  app.get('/api/intel/ai-threats', requireAuth, (req, res) => {
+    const neuralCache = require('../lib/neural-cache');
+    const cached = neuralCache.get('ai-kb:all');
+    if (cached) return res.json(cached);
+
+    const { search, category } = req.query;
+    let data;
+    if (search) {
+      data = aiKB.searchKB(search);
+    } else {
+      data = {
+        owasp: aiKB.getOWASPLLMTop10(),
+        atlas: aiKB.getATLASTechniques(),
+        injections: aiKB.getPromptInjections(),
+        vulnTypes: aiKB.getAIVulnTypes(),
+        tools: aiKB.getDefensiveTools(),
+        stats: aiKB.getKBStats(),
+      };
+    }
+    if (category) {
+      const filtered = {};
+      if (category === 'owasp') filtered.owasp = data.owasp;
+      else if (category === 'atlas') filtered.atlas = data.atlas;
+      else if (category === 'injections') filtered.injections = data.injections;
+      else if (category === 'vulnTypes') filtered.vulnTypes = data.vulnTypes;
+      else if (category === 'tools') filtered.tools = data.tools;
+      filtered.stats = data.stats || aiKB.getKBStats();
+      data = filtered;
+    }
+    if (!search) neuralCache.set('ai-kb:all', data, 600000); // 10min TTL (static data)
+    res.json(data);
+  });
+
+  app.post('/api/intel/ai-threats/analyze', requireRole('analyst'), async (req, res) => {
+    const { entry } = req.body;
+    if (!entry || !entry.id || !entry.name) return res.status(400).json({ error: 'entry with id and name required' });
+    if (!askAI) return res.status(503).json({ error: 'AI provider not configured' });
+    try {
+      const prompt = aiKB.buildAIThreatPrompt(entry);
+      const analysis = await askAI(prompt, { timeout: 120000 });
+      res.json({ analysis: analysis || 'Analysis unavailable' });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
   });
 };

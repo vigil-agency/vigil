@@ -72,6 +72,7 @@ Views.knowledge = {
         '<div class="tab-item" data-tab="cve-watch">CVE Watch</div>' +
         '<div class="tab-item" data-tab="kev">CISA KEV</div>' +
         '<div class="tab-item" data-tab="briefing">AI Briefing</div>' +
+        '<div class="tab-item" data-tab="ai-threats">AI Threats</div>' +
       '</div>' +
       '<div id="intel-content"></div>';
 
@@ -170,6 +171,7 @@ Views.knowledge = {
       else if (this._tab === 'cve-watch') this._loadCVEWatch();
       else if (this._tab === 'briefing') this._loadBriefings();
       else if (this._tab === 'kev') this._loadKEV();
+      else if (this._tab === 'ai-threats') this._loadAIThreats();
     } catch (e) {
       c.innerHTML = '<div class="empty-state"><div class="empty-state-title">Error loading tab</div><div class="empty-state-desc">' + escapeHtml(e.message) + '</div></div>';
     }
@@ -770,5 +772,188 @@ Views.knowledge = {
     }
 
     Modal.open({ title: cve.id + ' — ' + escapeHtml(cve.severity || 'N/A') + (cve.score ? ' (' + cve.score + ')' : ''), body: body, size: 'lg' });
+  },
+
+  /* ═══════════════════ AI THREATS TAB ═══════════════════ */
+  _aiThreatsData: null,
+  _aiThreatsCategory: 'owasp',
+
+  _loadAIThreats: function() {
+    var self = this;
+    var c = document.getElementById('intel-content');
+    if (self._aiThreatsData) { self._renderAIThreats(); return; }
+    c.innerHTML = '<div class="loading-state"><div class="spinner"></div><div>Loading AI Security Knowledge Base...</div></div>';
+    fetch('/api/intel/ai-threats', { credentials: 'same-origin' })
+      .then(function(r) { return r.json(); })
+      .then(function(d) { self._aiThreatsData = d; self._renderAIThreats(); })
+      .catch(function() { self._renderMsg('Failed to load AI threat knowledge base.'); });
+  },
+
+  _renderAIThreats: function() {
+    var c = document.getElementById('intel-content');
+    var d = this._aiThreatsData;
+    if (!c || !d) return;
+    var stats = d.stats || {};
+    var self = this;
+    var cat = self._aiThreatsCategory;
+
+    var html = '<div class="stat-grid" style="margin-bottom:16px;">' +
+      '<div class="stat-card" style="text-align:center;cursor:pointer;" data-aicat="owasp"><div class="stat-value" style="color:var(--orange);">' + (stats.owaspCount || 10) + '</div><div class="stat-label">OWASP LLM Top 10</div></div>' +
+      '<div class="stat-card" style="text-align:center;cursor:pointer;" data-aicat="atlas"><div class="stat-value" style="color:var(--cyan);">' + (stats.atlasCount || 15) + '</div><div class="stat-label">MITRE ATLAS</div></div>' +
+      '<div class="stat-card" style="text-align:center;cursor:pointer;" data-aicat="injections"><div class="stat-value" style="color:var(--orange);">' + (stats.injectionCount || 8) + '</div><div class="stat-label">Injection Patterns</div></div>' +
+      '<div class="stat-card" style="text-align:center;cursor:pointer;" data-aicat="vulnTypes"><div class="stat-value" style="color:var(--cyan);">' + (stats.vulnTypeCount || 8) + '</div><div class="stat-label">AI Vuln Types</div></div>' +
+      '<div class="stat-card" style="text-align:center;cursor:pointer;" data-aicat="tools"><div class="stat-value" style="color:var(--cyan);">' + (stats.toolCount || 12) + '</div><div class="stat-label">Defensive Tools</div></div>' +
+    '</div>';
+
+    // Sub-category filter bar
+    var cats = [
+      { key: 'owasp', label: 'OWASP LLM Top 10' },
+      { key: 'atlas', label: 'MITRE ATLAS' },
+      { key: 'injections', label: 'Prompt Injection' },
+      { key: 'vulnTypes', label: 'AI Vuln Types' },
+      { key: 'tools', label: 'Defensive Tools' },
+    ];
+    html += '<div class="tab-bar" style="margin-bottom:16px;">';
+    cats.forEach(function(c) {
+      html += '<div class="tab-item' + (cat === c.key ? ' active' : '') + '" data-aicat="' + c.key + '">' + c.label + '</div>';
+    });
+    html += '</div>';
+
+    // Render entries for selected category
+    var entries = d[cat] || [];
+    if (!entries.length) {
+      html += '<div class="empty-state"><div class="empty-state-title">No entries</div></div>';
+    } else {
+      html += '<div class="data-table"><table><thead><tr>';
+      if (cat === 'owasp') html += '<th style="width:60px;">ID</th><th>Name</th><th style="width:80px;">Severity</th><th>Description</th><th style="width:60px;"></th>';
+      else if (cat === 'atlas') html += '<th style="width:90px;">ID</th><th>Name</th><th>Tactic</th><th>Description</th>';
+      else if (cat === 'injections') html += '<th style="width:50px;">ID</th><th>Name</th><th style="width:70px;">Type</th><th style="width:80px;">Severity</th><th>Description</th>';
+      else if (cat === 'vulnTypes') html += '<th style="width:55px;">ID</th><th>Name</th><th style="width:80px;">Severity</th><th>Description</th>';
+      else if (cat === 'tools') html += '<th>Name</th><th style="width:90px;">Category</th><th>Description</th>';
+      html += '</tr></thead><tbody>';
+
+      entries.forEach(function(e, idx) {
+        var sevClass = (e.severity === 'critical') ? 'style="color:var(--orange);font-weight:700;"' :
+                       (e.severity === 'high') ? 'style="color:var(--orange);"' :
+                       'style="color:var(--text-secondary);"';
+        html += '<tr style="cursor:pointer;" data-aidx="' + idx + '">';
+        if (cat === 'owasp') {
+          html += '<td style="color:var(--cyan);font-weight:600;">' + escapeHtml(e.id) + '</td>' +
+            '<td style="font-weight:600;">' + escapeHtml(e.name) + '</td>' +
+            '<td><span ' + sevClass + '>' + escapeHtml(e.severity || '') + '</span></td>' +
+            '<td style="font-size:12px;color:var(--text-secondary);">' + escapeHtml((e.description || '').substring(0, 120)) + '...</td>' +
+            '<td><button class="btn btn-ghost btn-sm ai-threat-detail-btn" data-aidx="' + idx + '" style="font-size:11px;">Detail</button></td>';
+        } else if (cat === 'atlas') {
+          html += '<td style="color:var(--cyan);font-family:var(--font-mono);font-size:11px;">' + escapeHtml(e.id) + '</td>' +
+            '<td style="font-weight:600;">' + escapeHtml(e.name) + '</td>' +
+            '<td><span class="badge" style="font-size:10px;">' + escapeHtml(e.tactic || '') + '</span></td>' +
+            '<td style="font-size:12px;color:var(--text-secondary);">' + escapeHtml((e.description || '').substring(0, 140)) + '</td>';
+        } else if (cat === 'injections') {
+          html += '<td style="color:var(--orange);font-weight:600;">' + escapeHtml(e.id) + '</td>' +
+            '<td style="font-weight:600;">' + escapeHtml(e.name) + '</td>' +
+            '<td><span class="badge">' + escapeHtml(e.technique || '') + '</span></td>' +
+            '<td><span ' + sevClass + '>' + escapeHtml(e.severity || '') + '</span></td>' +
+            '<td style="font-size:12px;color:var(--text-secondary);">' + escapeHtml((e.description || '').substring(0, 120)) + '</td>';
+        } else if (cat === 'vulnTypes') {
+          html += '<td style="color:var(--orange);font-weight:600;">' + escapeHtml(e.id) + '</td>' +
+            '<td style="font-weight:600;">' + escapeHtml(e.name) + '</td>' +
+            '<td><span ' + sevClass + '>' + escapeHtml(e.severity || '') + '</span></td>' +
+            '<td style="font-size:12px;color:var(--text-secondary);">' + escapeHtml((e.description || '').substring(0, 140)) + '</td>';
+        } else if (cat === 'tools') {
+          html += '<td style="font-weight:600;color:var(--cyan);">' + escapeHtml(e.name) + '</td>' +
+            '<td><span class="badge">' + escapeHtml(e.category || '') + '</span></td>' +
+            '<td style="font-size:12px;color:var(--text-secondary);">' + escapeHtml(e.description || '') + '</td>';
+        }
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+    c.innerHTML = html;
+
+    // Event delegation for sub-category tabs and stat cards
+    c.querySelectorAll('[data-aicat]').forEach(function(el) {
+      el.addEventListener('click', function() {
+        self._aiThreatsCategory = el.getAttribute('data-aicat');
+        self._renderAIThreats();
+      });
+    });
+
+    // Detail modals for OWASP entries
+    c.querySelectorAll('[data-aidx]').forEach(function(el) {
+      if (el.tagName === 'TR' || el.classList.contains('ai-threat-detail-btn')) {
+        el.addEventListener('click', function(ev) {
+          ev.stopPropagation();
+          var idx = parseInt(el.getAttribute('data-aidx'));
+          self._showAIThreatDetail(cat, entries[idx]);
+        });
+      }
+    });
+  },
+
+  _showAIThreatDetail: function(cat, entry) {
+    if (!entry) return;
+    var self = this;
+    var body = '<div style="font-size:13px;line-height:1.7;">';
+
+    if (cat === 'owasp') {
+      body += '<div style="display:flex;gap:12px;margin-bottom:12px;">' +
+        '<span class="badge" style="background:var(--orange);color:#fff;">' + escapeHtml(entry.severity) + '</span>' +
+        '<span class="badge">' + escapeHtml(entry.category) + '</span>' +
+        (entry.cwe ? entry.cwe.map(function(c) { return '<span class="badge" style="font-size:10px;">' + escapeHtml(c) + '</span>'; }).join('') : '') +
+      '</div>' +
+      '<p style="color:var(--text-primary);margin-bottom:12px;">' + escapeHtml(entry.description) + '</p>';
+      if (entry.examples && entry.examples.length) {
+        body += '<h4 style="color:var(--orange);margin:12px 0 6px;">Attack Examples</h4><ul style="padding-left:16px;">';
+        entry.examples.forEach(function(ex) { body += '<li style="margin:4px 0;color:var(--text-secondary);">' + escapeHtml(ex) + '</li>'; });
+        body += '</ul>';
+      }
+      if (entry.mitigations && entry.mitigations.length) {
+        body += '<h4 style="color:var(--cyan);margin:12px 0 6px;">Mitigations</h4><ul style="padding-left:16px;">';
+        entry.mitigations.forEach(function(m) { body += '<li style="margin:4px 0;color:var(--text-secondary);">' + escapeHtml(m) + '</li>'; });
+        body += '</ul>';
+      }
+    } else if (cat === 'atlas') {
+      body += '<div style="margin-bottom:8px;"><span class="badge">' + escapeHtml(entry.tactic) + '</span> <span style="color:var(--text-tertiary);font-size:11px;">' + escapeHtml(entry.id) + '</span></div>' +
+        '<p style="color:var(--text-primary);margin-bottom:12px;">' + escapeHtml(entry.description) + '</p>' +
+        '<h4 style="color:var(--cyan);margin:12px 0 6px;">Detection</h4><p style="color:var(--text-secondary);">' + escapeHtml(entry.detection || 'N/A') + '</p>' +
+        '<h4 style="color:var(--cyan);margin:12px 0 6px;">Mitigation</h4><p style="color:var(--text-secondary);">' + escapeHtml(entry.mitigation || 'N/A') + '</p>';
+    } else if (cat === 'injections') {
+      body += '<div style="display:flex;gap:8px;margin-bottom:8px;"><span class="badge">' + escapeHtml(entry.technique) + '</span><span class="badge" style="' + (entry.severity === 'critical' ? 'background:var(--orange);color:#fff;' : '') + '">' + escapeHtml(entry.severity) + '</span></div>' +
+        '<p style="color:var(--text-primary);margin-bottom:12px;">' + escapeHtml(entry.description) + '</p>' +
+        '<h4 style="color:var(--orange);margin:12px 0 6px;">Pattern</h4><p style="color:var(--text-secondary);">' + escapeHtml(entry.pattern || '') + '</p>' +
+        '<h4 style="color:var(--cyan);margin:12px 0 6px;">Defense</h4><p style="color:var(--text-secondary);">' + escapeHtml(entry.defense || '') + '</p>';
+    } else if (cat === 'vulnTypes') {
+      body += '<div style="margin-bottom:8px;"><span class="badge" style="' + (entry.severity === 'critical' ? 'background:var(--orange);color:#fff;' : '') + '">' + escapeHtml(entry.severity) + '</span></div>' +
+        '<p style="color:var(--text-primary);margin-bottom:12px;">' + escapeHtml(entry.description) + '</p>' +
+        '<h4 style="color:var(--orange);margin:12px 0 6px;">Impact</h4><p style="color:var(--text-secondary);">' + escapeHtml(entry.impact || '') + '</p>' +
+        '<h4 style="color:var(--cyan);margin:12px 0 6px;">Defense</h4><p style="color:var(--text-secondary);">' + escapeHtml(entry.defense || '') + '</p>';
+    } else {
+      body += '<p style="color:var(--text-primary);">' + escapeHtml(entry.description || '') + '</p>';
+    }
+    body += '</div>';
+
+    var footer = '<button class="btn btn-ghost" onclick="Modal.close()">Close</button>';
+    if (cat !== 'tools') {
+      footer = '<button class="btn btn-primary btn-sm" id="ai-threat-analyze-btn">AI Analyze</button>' + footer;
+    }
+    Modal.open({ title: escapeHtml(entry.id || '') + ' — ' + escapeHtml(entry.name), body: body, footer: footer, size: 'lg' });
+
+    var btn = document.getElementById('ai-threat-analyze-btn');
+    if (btn) {
+      btn.addEventListener('click', function() {
+        btn.disabled = true; btn.textContent = 'Analyzing...';
+        fetch('/api/intel/ai-threats/analyze', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entry: { id: entry.id, name: entry.name, description: entry.description, category: entry.category || cat } })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.error) { Toast.error(d.error); btn.disabled = false; btn.textContent = 'AI Analyze'; return; }
+          Modal.open({ title: 'AI Analysis — ' + escapeHtml(entry.name), body: '<div style="font-size:13px;line-height:1.7;">' + self._md(d.analysis) + '</div>', size: 'lg' });
+        })
+        .catch(function() { Toast.error('Analysis failed'); btn.disabled = false; btn.textContent = 'AI Analyze'; });
+      });
+    }
   }
 };

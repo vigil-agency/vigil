@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { runCodeAudit, discoverFiles, VULN_TYPES, LANG_EXTENSIONS } = require('../lib/code-audit');
+const { analyzeBinary } = require('../lib/binary-analysis');
 
 const DATA = path.join(__dirname, '..', 'data');
 const SCANS_PATH = path.join(DATA, 'scans.json');
@@ -188,6 +189,126 @@ module.exports = function (app, ctx) {
       files: files.map(f => ({ path: f.relPath, size: f.size })),
       languages: validLangs.length ? validLangs : Object.keys(LANG_EXTENSIONS),
     });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BINARY ANALYSIS — /api/code-audit/binary
+  // ════════════════════════════════════════════════════════════════════════
+
+  // POST /api/code-audit/binary — analyze a binary file
+  app.post('/api/code-audit/binary', requireRole('analyst'), async (req, res) => {
+    const { target } = req.body;
+
+    if (!target || typeof target !== 'string') {
+      return res.status(400).json({ error: 'target (file path) is required' });
+    }
+
+    const resolvedPath = path.resolve(target);
+    if (!fs.existsSync(resolvedPath) || !fs.statSync(resolvedPath).isFile()) {
+      return res.status(400).json({ error: 'Target file does not exist: ' + target });
+    }
+
+    // Create scan record
+    const scan = {
+      id: crypto.randomUUID(),
+      type: 'binary-analysis',
+      target: resolvedPath,
+      status: 'pending',
+      findings: [],
+      findingsCount: 0,
+      createdAt: new Date().toISOString(),
+      createdBy: req.user ? req.user.username : 'unknown',
+    };
+
+    const scans = readJSON(SCANS_PATH, []);
+    scans.push(scan);
+    writeJSON(SCANS_PATH, scans);
+
+    // Return immediately
+    res.json({ scan: { id: scan.id, type: scan.type, target: scan.target, status: 'running' } });
+
+    // Run in background
+    try {
+      scan.status = 'running';
+      scan.startedAt = new Date().toISOString();
+
+      const runningScans = readJSON(SCANS_PATH, []);
+      const runIdx = runningScans.findIndex(s => s.id === scan.id);
+      if (runIdx >= 0) { runningScans[runIdx].status = 'running'; runningScans[runIdx].startedAt = scan.startedAt; }
+      writeJSON(SCANS_PATH, runningScans);
+
+      console.log(`  [BINARY] Starting analysis ${scan.id} on ${resolvedPath}`);
+
+      const result = await analyzeBinary(resolvedPath, {
+        askAI: ctx.askAI,
+        timeout: 120000,
+        onProgress: (progress) => {
+          if (ctx.io) {
+            ctx.io.emit('code_audit_progress', {
+              scanId: scan.id,
+              phase: progress.phase,
+              message: progress.message,
+            });
+          }
+        },
+      });
+
+      // Convert risk indicators to findings
+      scan.findings = (result.riskIndicators || []).map(ri => ({
+        id: crypto.randomUUID(),
+        scanId: scan.id,
+        type: 'binary_indicator',
+        title: ri.indicator,
+        severity: ri.severity,
+        details: ri.detail,
+        status: 'open',
+      }));
+
+      scan.findingsCount = scan.findings.length;
+      scan.status = 'completed';
+      scan.completedAt = new Date().toISOString();
+      scan.duration = result.duration;
+      scan.result = result;
+
+    } catch (e) {
+      console.error(`  [BINARY] Analysis ${scan.id} failed:`, e.message);
+      scan.status = 'failed';
+      scan.error = e.message;
+      scan.completedAt = new Date().toISOString();
+    }
+
+    console.log(`  [BINARY] Analysis ${scan.id} ${scan.status}: ${scan.findingsCount} indicators in ${scan.duration || 0}ms`);
+
+    const allScans = readJSON(SCANS_PATH, []);
+    const idx = allScans.findIndex(s => s.id === scan.id);
+    if (idx >= 0) allScans[idx] = scan;
+    writeJSON(SCANS_PATH, allScans);
+
+    if (ctx.io) {
+      ctx.io.emit('scan_complete', {
+        id: scan.id,
+        type: 'binary-analysis',
+        status: scan.status,
+        findingsCount: scan.findingsCount,
+      });
+    }
+  });
+
+  // GET /api/code-audit/binary/:id — get binary analysis results
+  app.get('/api/code-audit/binary/:id', requireAuth, (req, res) => {
+    const neuralCache = require('../lib/neural-cache');
+    const cacheKey = 'binary:' + req.params.id;
+    const cached = neuralCache.get(cacheKey);
+    if (cached) return res.json(cached);
+
+    const scans = readJSON(SCANS_PATH, []);
+    const scan = scans.find(s => s.id === req.params.id && s.type === 'binary-analysis');
+    if (!scan) return res.status(404).json({ error: 'Binary analysis not found' });
+
+    if (scan.status === 'completed') {
+      neuralCache.set(cacheKey, scan, 600000);
+    }
+    res.json(scan);
   });
 
   // POST /api/code-audit/:id/validate/:findingIdx — Raptor-style exploitability validation

@@ -1,14 +1,16 @@
 /**
- * Campaigns Routes — Multi-agent campaigns
+ * Campaigns Routes — Multi-agent campaigns + Purple Team Simulator
  */
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { MITRE_TACTICS, SCENARIO_TYPES, runSimulation } = require('../lib/purple-team');
 
 const DATA = path.join(__dirname, '..', 'data');
 const CAMPAIGNS_PATH = path.join(DATA, 'campaigns.json');
 const AGENTS_PATH = path.join(DATA, 'agents.json');
 const RUNS_PATH = path.join(DATA, 'agent-runs.json');
+const PURPLE_PATH = path.join(DATA, 'purple-team.json');
 
 function readJSON(p, fallback) {
   try { return JSON.parse(fs.readFileSync(p, 'utf8')); }
@@ -197,5 +199,122 @@ module.exports = function (app, ctx) {
     running.stop();
     runningCampaigns.delete(req.params.id);
     res.json({ success: true, message: 'Campaign stop signal sent' });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // PURPLE TEAM SIMULATOR — /api/campaigns/purple-team
+  // ════════════════════════════════════════════════════════════════════════
+
+  // GET /api/campaigns/purple-team/scenarios — list scenario types + MITRE tactics
+  app.get('/api/campaigns/purple-team/scenarios', requireAuth, (req, res) => {
+    res.json({ scenarios: SCENARIO_TYPES, tactics: MITRE_TACTICS });
+  });
+
+  // POST /api/campaigns/purple-team — launch purple team simulation
+  app.post('/api/campaigns/purple-team', requireRole('analyst'), async (req, res) => {
+    const { target, scope, scenario, defenses } = req.body;
+    if (!target) return res.status(400).json({ error: 'target required' });
+
+    const { askAIJSON } = ctx;
+    if (!askAIJSON) return res.status(503).json({ error: 'AI provider not configured' });
+
+    const sim = {
+      id: crypto.randomUUID(),
+      type: 'purple-team',
+      target: escapeHtml(target),
+      scope: escapeHtml(scope || ''),
+      scenario: scenario || 'external-attacker',
+      defenses: escapeHtml(defenses || ''),
+      status: 'running',
+      createdAt: new Date().toISOString(),
+      createdBy: req.user ? req.user.user : 'unknown',
+    };
+
+    const sims = readJSON(PURPLE_PATH, []);
+    sims.push(sim);
+    writeJSON(PURPLE_PATH, sims);
+
+    // Return immediately
+    res.json({ id: sim.id, status: 'running' });
+
+    // Run in background
+    try {
+      console.log(`  [PURPLE] Starting simulation ${sim.id} — ${scenario || 'external-attacker'} vs ${target}`);
+
+      if (ctx.io) {
+        ctx.io.emit('purple_team_progress', { id: sim.id, phase: 'starting', message: 'Initializing purple team simulation...' });
+      }
+
+      const result = await runSimulation({
+        target,
+        scope,
+        scenario: scenario || 'external-attacker',
+        defenses,
+        askAIJSON,
+        timeout: 120000,
+        onProgress: (progress) => {
+          if (ctx.io) {
+            ctx.io.emit('purple_team_progress', { id: sim.id, ...progress });
+          }
+        },
+      });
+
+      sim.status = 'completed';
+      sim.completedAt = new Date().toISOString();
+      sim.duration = result.duration;
+      sim.result = result;
+
+      console.log(`  [PURPLE] Simulation ${sim.id} completed: grade ${result.summary.grade}, ${result.tactics.length} tactics analyzed (${result.duration}ms)`);
+    } catch (e) {
+      console.error(`  [PURPLE] Simulation ${sim.id} failed:`, e.message);
+      sim.status = 'failed';
+      sim.error = e.message;
+      sim.completedAt = new Date().toISOString();
+    }
+
+    // Save
+    const allSims = readJSON(PURPLE_PATH, []);
+    const idx = allSims.findIndex(s => s.id === sim.id);
+    if (idx >= 0) allSims[idx] = sim;
+    writeJSON(PURPLE_PATH, allSims);
+
+    if (ctx.io) {
+      ctx.io.emit('purple_team_complete', {
+        id: sim.id,
+        status: sim.status,
+        grade: sim.result?.summary?.grade,
+        tacticsCount: sim.result?.tactics?.length || 0,
+      });
+    }
+  });
+
+  // GET /api/campaigns/purple-team — list simulations
+  app.get('/api/campaigns/purple-team', requireAuth, (req, res) => {
+    const sims = readJSON(PURPLE_PATH, []);
+    res.json({
+      simulations: sims.map(s => ({
+        id: s.id, target: s.target, scenario: s.scenario, status: s.status,
+        grade: s.result?.summary?.grade, score: s.result?.summary?.defenseScore,
+        duration: s.duration, createdAt: s.createdAt,
+      })).reverse(),
+    });
+  });
+
+  // GET /api/campaigns/purple-team/:id — get simulation details (cached for completed)
+  app.get('/api/campaigns/purple-team/:id', requireAuth, (req, res) => {
+    const neuralCache = require('../lib/neural-cache');
+    const cacheKey = 'purple:' + req.params.id;
+    const cached = neuralCache.get(cacheKey);
+    if (cached) return res.json(cached);
+
+    const sims = readJSON(PURPLE_PATH, []);
+    const sim = sims.find(s => s.id === req.params.id);
+    if (!sim) return res.status(404).json({ error: 'Simulation not found' });
+
+    // Cache completed simulations (immutable) for 10 minutes
+    if (sim.status === 'completed' || sim.status === 'failed') {
+      neuralCache.set(cacheKey, sim, 600000);
+    }
+    res.json(sim);
   });
 };

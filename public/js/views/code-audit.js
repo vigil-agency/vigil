@@ -1,15 +1,25 @@
-/* Vigil v1.0 — Code Audit View (LLM-Driven Vulnerability Scanner) */
+/* Vigil v1.0 — Code Audit View (LLM-Driven Vulnerability Scanner + Binary Analysis) */
 Views['code-audit'] = {
   _scanId: null,
   _pollTimer: null,
+  _tab: 'source',
+  _binaryScanId: null,
+  _binaryPollTimer: null,
 
   init: function() {
     var el = document.getElementById('view-code-audit');
     el.innerHTML =
       '<div class="section-header">' +
         '<div class="section-title">Code Audit</div>' +
-        '<div style="color:var(--text-tertiary);font-size:var(--font-size-sm);">AI-powered source code vulnerability scanner</div>' +
+        '<div style="color:var(--text-tertiary);font-size:var(--font-size-sm);">AI-powered source code &amp; binary analysis</div>' +
       '</div>' +
+      '<div class="tab-bar" id="ca-tabs">' +
+        '<div class="tab-item active" data-tab="source">Source Code</div>' +
+        '<div class="tab-item" data-tab="binary">Binary Analysis</div>' +
+      '</div>' +
+
+      // ─── SOURCE CODE TAB ───
+      '<div id="ca-tab-source">' +
 
       // Config card
       '<div class="glass-card" style="margin-bottom:20px;">' +
@@ -75,11 +85,60 @@ Views['code-audit'] = {
             '<div class="empty-state-desc">Enter a project directory path and click Scan to start AI-powered vulnerability analysis</div>' +
           '</div>' +
         '</div>' +
-      '</div>';
+      '</div>' +
+      '</div>' + // end ca-tab-source
+
+      // ─── BINARY ANALYSIS TAB ───
+      '<div id="ca-tab-binary" style="display:none;">' +
+        '<div class="glass-card" style="margin-bottom:20px;">' +
+          '<div class="form-inline" style="flex-wrap:wrap;gap:10px;">' +
+            '<div class="form-group" style="flex:3;min-width:300px;">' +
+              '<label class="form-label">Binary File Path</label>' +
+              '<input type="text" class="form-input" id="ba-target" placeholder="/usr/bin/nmap or /path/to/suspicious.exe">' +
+            '</div>' +
+            '<div class="form-group" style="align-self:flex-end;">' +
+              '<button class="btn btn-primary" id="ba-scan-btn">Analyze</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="glass-card" id="ba-progress-card" style="display:none;margin-bottom:20px;">' +
+          '<div style="display:flex;align-items:center;gap:12px;">' +
+            '<div class="spinner"></div>' +
+            '<div>' +
+              '<div style="color:var(--text-primary);font-weight:500;" id="ba-progress-title">Analyzing binary...</div>' +
+              '<div style="color:var(--text-tertiary);font-size:var(--font-size-sm);margin-top:4px;" id="ba-progress-detail">Initializing...</div>' +
+            '</div>' +
+          '</div>' +
+          '<div style="margin-top:12px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;">' +
+            '<div id="ba-progress-bar" style="height:100%;width:0%;background:var(--cyan);border-radius:2px;transition:width 0.5s ease;"></div>' +
+          '</div>' +
+        '</div>' +
+        '<div id="ba-results">' +
+          '<div class="glass-card">' +
+            '<div class="empty-state">' +
+              '<div class="empty-state-icon">&#128190;</div>' +
+              '<div class="empty-state-title">No Analysis Results</div>' +
+              '<div class="empty-state-desc">Enter a binary file path (ELF, PE, Mach-O) to extract metadata, strings, IOCs, imports, and run AI threat assessment</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>'; // end ca-tab-binary
 
     var self = this;
     document.getElementById('ca-scan-btn').addEventListener('click', function() { self.runScan(); });
     document.getElementById('ca-preview-btn').addEventListener('click', function() { self.previewFiles(); });
+    document.getElementById('ba-scan-btn').addEventListener('click', function() { self.runBinaryScan(); });
+
+    // Tab switching
+    document.querySelectorAll('#ca-tabs .tab-item').forEach(function(t) {
+      t.addEventListener('click', function() {
+        document.querySelectorAll('#ca-tabs .tab-item').forEach(function(x) { x.classList.remove('active'); });
+        t.classList.add('active');
+        self._tab = t.getAttribute('data-tab');
+        document.getElementById('ca-tab-source').style.display = self._tab === 'source' ? 'block' : 'none';
+        document.getElementById('ca-tab-binary').style.display = self._tab === 'binary' ? 'block' : 'none';
+      });
+    });
 
     // Listen for Socket.IO progress events
     if (window._socket) {
@@ -87,10 +146,16 @@ Views['code-audit'] = {
         if (data.scanId === self._scanId) {
           self.updateProgress(data);
         }
+        if (data.scanId === self._binaryScanId) {
+          self.updateBinaryProgress(data);
+        }
       });
       window._socket.on('scan_complete', function(data) {
         if (data.id === self._scanId && data.type === 'code-audit') {
           self.loadResults(data.id);
+        }
+        if (data.id === self._binaryScanId && data.type === 'binary-analysis') {
+          self.loadBinaryResults(data.id);
         }
       });
     }
@@ -99,6 +164,7 @@ Views['code-audit'] = {
   show: function() {},
   hide: function() {
     if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; }
+    if (this._binaryPollTimer) { clearInterval(this._binaryPollTimer); this._binaryPollTimer = null; }
   },
 
   previewFiles: function() {
@@ -405,5 +471,282 @@ Views['code-audit'] = {
       if (btn) { btn.disabled = false; btn.textContent = 'Validate Exploitability'; }
       container.innerHTML = '<div style="color:var(--orange);font-size:var(--font-size-xs);margin-top:8px;">Validation failed: ' + escapeHtml(err.message) + '</div>';
     });
+  },
+
+  /* ═══════════════════ BINARY ANALYSIS ═══════════════════ */
+  _md: function(text) {
+    if (!text) return '';
+    var s = String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    s = s.replace(/^### (.+)$/gm, '<h4 style="color:var(--text-primary);font-size:var(--font-size-sm);font-weight:700;margin:14px 0 6px;">$1</h4>');
+    s = s.replace(/^## (.+)$/gm, '<h3 style="color:var(--cyan);font-size:var(--font-size-base);font-weight:700;margin:18px 0 8px;border-bottom:1px solid var(--border);padding-bottom:6px;">$1</h3>');
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong style="color:var(--text-primary);">$1</strong>');
+    s = s.replace(/^[\-\*] (.+)$/gm, '<div style="display:flex;gap:8px;margin:3px 0 3px 8px;"><span style="color:var(--cyan);">&#8226;</span><span>$1</span></div>');
+    s = s.replace(/^(\d+)\. (.+)$/gm, '<div style="display:flex;gap:8px;margin:3px 0 3px 8px;"><span style="color:var(--cyan);font-weight:600;min-width:18px;">$1.</span><span>$2</span></div>');
+    s = s.replace(/(CVE-\d{4}-\d{4,})/g, '<span style="color:var(--orange);font-weight:600;">$1</span>');
+    s = s.replace(/\n\n/g, '</p><p style="margin:8px 0;">');
+    s = s.replace(/\n/g, '<br>');
+    return '<p style="margin:8px 0;">' + s + '</p>';
+  },
+
+  runBinaryScan: function() {
+    var target = document.getElementById('ba-target').value.trim();
+    if (!target) { Toast.warning('Enter a binary file path'); return; }
+
+    var scanBtn = document.getElementById('ba-scan-btn');
+    var progressCard = document.getElementById('ba-progress-card');
+
+    scanBtn.disabled = true;
+    progressCard.style.display = 'block';
+    this.updateBinaryProgress({ phase: 'identify', message: 'Starting binary analysis...' });
+
+    var self = this;
+
+    fetch('/api/code-audit/binary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ target: target })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) {
+        progressCard.style.display = 'none';
+        scanBtn.disabled = false;
+        Toast.error(data.error);
+        return;
+      }
+
+      self._binaryScanId = data.scan.id;
+      self.updateBinaryProgress({ phase: 'strings', message: 'Analysis in progress...' });
+
+      self._binaryPollTimer = setInterval(function() {
+        fetch('/api/code-audit/binary/' + self._binaryScanId, { credentials: 'same-origin' })
+          .then(function(r) { return r.json(); })
+          .then(function(scan) {
+            if (scan.status === 'completed' || scan.status === 'failed') {
+              clearInterval(self._binaryPollTimer);
+              self._binaryPollTimer = null;
+              self.renderBinaryResults(scan);
+            }
+          })
+          .catch(function() {});
+      }, 3000);
+    })
+    .catch(function() {
+      progressCard.style.display = 'none';
+      scanBtn.disabled = false;
+      Toast.error('Failed to start binary analysis');
+    });
+  },
+
+  updateBinaryProgress: function(data) {
+    var title = document.getElementById('ba-progress-title');
+    var detail = document.getElementById('ba-progress-detail');
+    var bar = document.getElementById('ba-progress-bar');
+
+    if (detail) detail.textContent = data.message || '';
+
+    var phaseProgress = { identify: 10, strings: 30, structure: 50, ai: 70, complete: 100 };
+    var pct = phaseProgress[data.phase] || 50;
+    if (bar) bar.style.width = pct + '%';
+
+    var titles = {
+      identify: 'Identifying file type...',
+      strings: 'Extracting strings & IOCs...',
+      structure: 'Analyzing binary structure...',
+      ai: 'Running AI threat assessment...',
+      complete: 'Analysis complete'
+    };
+    if (title && titles[data.phase]) title.textContent = titles[data.phase];
+  },
+
+  loadBinaryResults: function(scanId) {
+    var self = this;
+    fetch('/api/code-audit/binary/' + scanId, { credentials: 'same-origin' })
+      .then(function(r) { return r.json(); })
+      .then(function(scan) { self.renderBinaryResults(scan); })
+      .catch(function() { Toast.error('Failed to load binary results'); });
+  },
+
+  renderBinaryResults: function(scan) {
+    var progressCard = document.getElementById('ba-progress-card');
+    var scanBtn = document.getElementById('ba-scan-btn');
+    var resultsEl = document.getElementById('ba-results');
+
+    progressCard.style.display = 'none';
+    scanBtn.disabled = false;
+
+    if (this._binaryPollTimer) { clearInterval(this._binaryPollTimer); this._binaryPollTimer = null; }
+
+    if (scan.status === 'failed') {
+      resultsEl.innerHTML =
+        '<div class="glass-card"><div class="empty-state">' +
+          '<div class="empty-state-icon" style="color:var(--orange);">&#10007;</div>' +
+          '<div class="empty-state-title">Analysis Failed</div>' +
+          '<div class="empty-state-desc">' + escapeHtml(scan.error || 'Unknown error') + '</div>' +
+        '</div></div>';
+      Toast.error('Binary analysis failed');
+      return;
+    }
+
+    var r = scan.result || {};
+    var ft = r.fileType || {};
+    var h = r.hashes || {};
+    var ent = r.entropy || {};
+    var str = r.strings || {};
+    var iocs = r.iocs || {};
+    var struct = r.structure || {};
+    var duration = r.duration ? (r.duration / 1000).toFixed(1) + 's' : '--';
+    var self = this;
+
+    // Stats
+    var riskCount = (r.riskIndicators || []).length;
+    var iocCount = (iocs.urls || []).length + (iocs.ips || []).length + (iocs.emails || []).length + (iocs.domains || []).length;
+    var html =
+      '<div class="stat-grid" style="margin-bottom:16px;">' +
+        '<div class="stat-card"><div class="stat-card-label">Risk Indicators</div><div class="stat-card-value" style="color:' + (riskCount > 0 ? 'var(--orange)' : 'var(--cyan)') + ';">' + riskCount + '</div></div>' +
+        '<div class="stat-card"><div class="stat-card-label">IOCs Found</div><div class="stat-card-value" style="color:' + (iocCount > 0 ? 'var(--orange)' : 'var(--cyan)') + ';">' + iocCount + '</div></div>' +
+        '<div class="stat-card"><div class="stat-card-label">Strings</div><div class="stat-card-value">' + (str.total || 0) + '</div></div>' +
+        '<div class="stat-card"><div class="stat-card-label">Duration</div><div class="stat-card-value">' + duration + '</div></div>' +
+      '</div>';
+
+    // File info card
+    html += '<div class="glass-card" style="margin-bottom:16px;">' +
+      '<div class="glass-card-header"><div class="glass-card-title">File Information</div></div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:var(--font-size-sm);">' +
+        '<tr><td style="padding:6px 12px;color:var(--text-tertiary);width:140px;border-bottom:1px solid var(--border);">File</td>' +
+          '<td style="padding:6px 12px;color:var(--text-primary);border-bottom:1px solid var(--border);font-weight:600;">' + escapeHtml(r.file || '') + '</td></tr>' +
+        '<tr><td style="padding:6px 12px;color:var(--text-tertiary);border-bottom:1px solid var(--border);">Size</td>' +
+          '<td style="padding:6px 12px;color:var(--text-secondary);border-bottom:1px solid var(--border);">' + ((r.size || 0) / 1024).toFixed(1) + ' KB (' + (r.size || 0).toLocaleString() + ' bytes)</td></tr>' +
+        '<tr><td style="padding:6px 12px;color:var(--text-tertiary);border-bottom:1px solid var(--border);">Format</td>' +
+          '<td style="padding:6px 12px;color:var(--cyan);font-weight:600;border-bottom:1px solid var(--border);">' + escapeHtml((ft.format || 'Unknown') + ' ' + (ft.bits || '') + '-bit ' + (ft.arch || '')) + '</td></tr>' +
+        '<tr><td style="padding:6px 12px;color:var(--text-tertiary);border-bottom:1px solid var(--border);">Type</td>' +
+          '<td style="padding:6px 12px;color:var(--text-secondary);border-bottom:1px solid var(--border);">' + escapeHtml(ft.detail || '') + '</td></tr>' +
+        '<tr><td style="padding:6px 12px;color:var(--text-tertiary);border-bottom:1px solid var(--border);">Entropy</td>' +
+          '<td style="padding:6px 12px;color:' + (ent.packed ? 'var(--orange)' : 'var(--text-secondary)') + ';border-bottom:1px solid var(--border);">' + (ent.value || 0) + ' — ' + escapeHtml(ent.assessment || '') + '</td></tr>' +
+        '<tr><td style="padding:6px 12px;color:var(--text-tertiary);border-bottom:1px solid var(--border);">MD5</td>' +
+          '<td style="padding:6px 12px;color:var(--text-secondary);font-family:var(--font-mono);font-size:11px;border-bottom:1px solid var(--border);">' + escapeHtml(h.md5 || '') + '</td></tr>' +
+        '<tr><td style="padding:6px 12px;color:var(--text-tertiary);border-bottom:1px solid var(--border);">SHA256</td>' +
+          '<td style="padding:6px 12px;color:var(--text-secondary);font-family:var(--font-mono);font-size:11px;border-bottom:1px solid var(--border);word-break:break-all;">' + escapeHtml(h.sha256 || '') + '</td></tr>' +
+      '</table></div>';
+
+    // Risk indicators
+    if (r.riskIndicators && r.riskIndicators.length) {
+      html += '<div class="glass-card" style="margin-bottom:16px;">' +
+        '<div class="glass-card-header"><div class="glass-card-title" style="color:var(--orange);">Risk Indicators (' + r.riskIndicators.length + ')</div></div>';
+      r.riskIndicators.forEach(function(ri) {
+        html += '<div style="padding:8px 0;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;">' +
+          '<span class="badge ' + severityBadge(ri.severity) + '" style="flex-shrink:0;">' + escapeHtml(ri.severity) + '</span>' +
+          '<div><div style="color:var(--text-primary);font-weight:500;font-size:var(--font-size-sm);">' + escapeHtml(ri.indicator) + '</div>' +
+          '<div style="color:var(--text-tertiary);font-size:11px;margin-top:2px;">' + escapeHtml(ri.detail) + '</div></div></div>';
+      });
+      html += '</div>';
+    }
+
+    // Suspicious imports
+    if (r.suspiciousImports && r.suspiciousImports.length) {
+      html += '<div class="glass-card" style="margin-bottom:16px;">' +
+        '<div class="glass-card-header"><div class="glass-card-title" style="color:var(--orange);">Suspicious Imports (' + r.suspiciousImports.length + ')</div></div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+      r.suspiciousImports.forEach(function(imp) {
+        html += '<span class="tag" style="color:var(--orange);border-color:var(--orange);font-family:var(--font-mono);font-size:11px;">' + escapeHtml(imp) + '</span>';
+      });
+      html += '</div></div>';
+    }
+
+    // IOCs
+    if (iocCount > 0) {
+      html += '<div class="glass-card" style="margin-bottom:16px;">' +
+        '<div class="glass-card-header"><div class="glass-card-title">Indicators of Compromise (' + iocCount + ')</div></div>';
+
+      if (iocs.urls && iocs.urls.length) {
+        html += '<div style="margin-bottom:12px;"><div style="color:var(--text-tertiary);font-size:var(--font-size-xs);text-transform:uppercase;margin-bottom:6px;">URLs (' + iocs.urls.length + ')</div>';
+        iocs.urls.forEach(function(u) {
+          html += '<div style="font-family:var(--font-mono);font-size:11px;color:var(--orange);padding:2px 0;word-break:break-all;">' + escapeHtml(u) + '</div>';
+        });
+        html += '</div>';
+      }
+      if (iocs.ips && iocs.ips.length) {
+        html += '<div style="margin-bottom:12px;"><div style="color:var(--text-tertiary);font-size:var(--font-size-xs);text-transform:uppercase;margin-bottom:6px;">IP Addresses (' + iocs.ips.length + ')</div>' +
+          '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+        iocs.ips.forEach(function(ip) { html += '<span class="tag" style="font-family:var(--font-mono);font-size:11px;">' + escapeHtml(ip) + '</span>'; });
+        html += '</div></div>';
+      }
+      if (iocs.emails && iocs.emails.length) {
+        html += '<div style="margin-bottom:12px;"><div style="color:var(--text-tertiary);font-size:var(--font-size-xs);text-transform:uppercase;margin-bottom:6px;">Email Addresses (' + iocs.emails.length + ')</div>';
+        iocs.emails.forEach(function(e) { html += '<div style="font-size:11px;color:var(--text-secondary);padding:2px 0;">' + escapeHtml(e) + '</div>'; });
+        html += '</div>';
+      }
+      if (iocs.domains && iocs.domains.length) {
+        html += '<div style="margin-bottom:12px;"><div style="color:var(--text-tertiary);font-size:var(--font-size-xs);text-transform:uppercase;margin-bottom:6px;">Domains (' + iocs.domains.length + ')</div>' +
+          '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+        iocs.domains.forEach(function(d) { html += '<span class="tag" style="font-family:var(--font-mono);font-size:11px;">' + escapeHtml(d) + '</span>'; });
+        html += '</div></div>';
+      }
+      html += '</div>';
+    }
+
+    // Libraries & Imports
+    if ((struct.libraries && struct.libraries.length) || (struct.imports && struct.imports.length)) {
+      html += '<div class="glass-card" style="margin-bottom:16px;">' +
+        '<div class="glass-card-header"><div class="glass-card-title">Libraries & Imports</div></div>';
+
+      if (struct.libraries && struct.libraries.length) {
+        html += '<div style="margin-bottom:12px;"><div style="color:var(--text-tertiary);font-size:var(--font-size-xs);text-transform:uppercase;margin-bottom:6px;">Linked Libraries (' + struct.libraries.length + ')</div>' +
+          '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+        struct.libraries.forEach(function(lib) {
+          html += '<span class="tag tag-cyan" style="font-family:var(--font-mono);font-size:11px;">' + escapeHtml(lib) + '</span>';
+        });
+        html += '</div></div>';
+      }
+
+      if (struct.imports && struct.imports.length) {
+        html += '<div><div style="color:var(--text-tertiary);font-size:var(--font-size-xs);text-transform:uppercase;margin-bottom:6px;">Imports (' + struct.imports.length + ')</div>' +
+          '<div style="max-height:200px;overflow-y:auto;font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);">';
+        struct.imports.slice(0, 100).forEach(function(imp) {
+          var color = (r.suspiciousImports || []).indexOf(imp.name) >= 0 ? 'var(--orange)' : 'var(--text-secondary)';
+          html += '<div style="padding:1px 0;color:' + color + ';">' + escapeHtml(imp.name || '') + '</div>';
+        });
+        if (struct.imports.length > 100) html += '<div style="color:var(--text-tertiary);padding-top:4px;">... and ' + (struct.imports.length - 100) + ' more</div>';
+        html += '</div></div>';
+      }
+      html += '</div>';
+    }
+
+    // Sections
+    if (struct.sections && struct.sections.length) {
+      html += '<div class="glass-card" style="margin-bottom:16px;">' +
+        '<div class="glass-card-header"><div class="glass-card-title">Sections (' + struct.sections.length + ')</div></div>' +
+        '<table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Address</th><th>Size</th></tr></thead><tbody>';
+      struct.sections.forEach(function(sec) {
+        html += '<tr><td style="font-family:var(--font-mono);color:var(--cyan);">' + escapeHtml(sec.name || '') + '</td>' +
+          '<td style="color:var(--text-tertiary);font-size:11px;">' + escapeHtml(sec.type || '') + '</td>' +
+          '<td style="font-family:var(--font-mono);font-size:11px;">' + escapeHtml(sec.addr || '') + '</td>' +
+          '<td>' + (sec.size || 0).toLocaleString() + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+
+    // Interesting strings
+    if (str.interesting && str.interesting.length) {
+      html += '<div class="glass-card" style="margin-bottom:16px;">' +
+        '<div class="glass-card-header"><div class="glass-card-title">Interesting Strings (' + str.interesting.length + ')</div></div>' +
+        '<div style="max-height:300px;overflow-y:auto;font-family:var(--font-mono);font-size:11px;color:var(--orange);">';
+      str.interesting.forEach(function(s) {
+        html += '<div style="padding:2px 0;border-bottom:1px solid var(--border);word-break:break-all;">' + escapeHtml(s) + '</div>';
+      });
+      html += '</div></div>';
+    }
+
+    // AI Assessment
+    if (r.aiAssessment) {
+      html += '<div class="glass-card" style="margin-bottom:16px;">' +
+        '<div class="glass-card-header"><div class="glass-card-title" style="color:var(--cyan);">AI Threat Assessment</div></div>' +
+        '<div style="color:var(--text-secondary);font-size:var(--font-size-sm);line-height:1.8;">' +
+          self._md(r.aiAssessment) + '</div></div>';
+    }
+
+    resultsEl.innerHTML = html;
+    Toast.success('Binary analysis complete — ' + riskCount + ' risk indicator(s), ' + iocCount + ' IOC(s)');
   }
 };

@@ -1,10 +1,12 @@
 /**
- * Ephemeral Infrastructure Routes — Disposable proxy node management
- * Inspired by fluffy-barnacle's Codespaces-as-infrastructure approach.
+ * Ephemeral Infrastructure Routes — Disposable proxy node + tunnel management
+ * Inspired by fluffy-barnacle (Codespace proxies) + pgrok (SSH tunnels + callback listeners).
  *
- * Manages GitHub Codespace proxies for anonymous scanning.
+ * Manages: GitHub Codespace proxies, SSH tunnels (forward/reverse/dynamic),
+ * and OOB callback listeners for vulnerability detection.
  */
 const proxy = require('../lib/ephemeral-proxy');
+const tunnelMgr = require('../lib/tunnel-manager');
 
 module.exports = function (app, ctx) {
   const { requireAuth, requireRole, askAIJSON, io } = ctx;
@@ -92,6 +94,112 @@ Respond with valid JSON only:
       res.status(500).json({ error: e.message });
     }
   });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // SSH TUNNELS (pgrok-inspired)
+  // ════════════════════════════════════════════════════════════════════════
+
+  // GET /api/proxy-nodes/tunnels — list all SSH tunnels
+  app.get('/api/proxy-nodes/tunnels', requireRole('analyst'), (req, res) => {
+    const neuralCache = require('../lib/neural-cache');
+    const cached = neuralCache.get('tunnels:list');
+    if (cached) return res.json(cached);
+    const data = tunnelMgr.listTunnels();
+    neuralCache.set('tunnels:list', data, 30000); // 30s TTL
+    res.json(data);
+  });
+
+  // POST /api/proxy-nodes/tunnels — create SSH tunnel
+  app.post('/api/proxy-nodes/tunnels', requireRole('analyst'), async (req, res) => {
+    const { type, sshTarget, localPort, remoteHost, remotePort, sshPort, sshKey, autoReconnect } = req.body;
+    if (!type || !sshTarget || !localPort) {
+      return res.status(400).json({ error: 'type, sshTarget, and localPort are required' });
+    }
+    try {
+      const tunnel = await tunnelMgr.createTunnel({
+        type, sshTarget, localPort: parseInt(localPort),
+        remoteHost, remotePort: remotePort ? parseInt(remotePort) : undefined,
+        sshPort: sshPort ? parseInt(sshPort) : 22,
+        sshKey, autoReconnect,
+      });
+      require('../lib/neural-cache').invalidate('tunnels:list');
+      if (io) io.emit('tunnel_update', { action: 'created', tunnel });
+      res.json(tunnel);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // DELETE /api/proxy-nodes/tunnels/:id — stop a tunnel
+  app.delete('/api/proxy-nodes/tunnels/:id', requireRole('analyst'), (req, res) => {
+    try {
+      const result = tunnelMgr.stopTunnel(req.params.id);
+      require('../lib/neural-cache').invalidate('tunnels:list');
+      if (io) io.emit('tunnel_update', { action: 'stopped', id: req.params.id });
+      res.json(result);
+    } catch (e) {
+      res.status(404).json({ error: e.message });
+    }
+  });
+
+  // POST /api/proxy-nodes/tunnels/:id/health — check tunnel health
+  app.post('/api/proxy-nodes/tunnels/:id/health', requireRole('analyst'), async (req, res) => {
+    try {
+      const health = await tunnelMgr.checkTunnelHealth(req.params.id);
+      res.json(health);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // CALLBACK LISTENER — OOB vulnerability detection
+  // ════════════════════════════════════════════════════════════════════════
+
+  // GET /api/proxy-nodes/callback — get listener status
+  app.get('/api/proxy-nodes/callback', requireRole('analyst'), (req, res) => {
+    res.json(tunnelMgr.getCallbackStatus());
+  });
+
+  // POST /api/proxy-nodes/callback — start/stop listener
+  app.post('/api/proxy-nodes/callback', requireRole('analyst'), (req, res) => {
+    const { action, port } = req.body;
+    try {
+      if (action === 'stop') {
+        res.json(tunnelMgr.stopCallbackListener());
+      } else {
+        const result = tunnelMgr.startCallbackListener(port ? parseInt(port) : 9999);
+        if (io) io.emit('callback_update', { action: 'started', port: result.port });
+        res.json(result);
+      }
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // GET /api/proxy-nodes/callback/log — get captured requests
+  app.get('/api/proxy-nodes/callback/log', requireRole('analyst'), (req, res) => {
+    const targetedOnly = req.query.targeted === 'true';
+    const limit = parseInt(req.query.limit) || 50;
+    const neuralCache = require('../lib/neural-cache');
+    const cacheKey = 'callback:log:' + targetedOnly + ':' + limit;
+    const cached = neuralCache.get(cacheKey);
+    if (cached) return res.json(cached);
+    const entries = tunnelMgr.getCallbackLog({ targetedOnly, limit });
+    neuralCache.set(cacheKey, entries, 10000); // 10s TTL
+    res.json(entries);
+  });
+
+  // DELETE /api/proxy-nodes/callback/log — clear log
+  app.delete('/api/proxy-nodes/callback/log', requireRole('analyst'), (req, res) => {
+    tunnelMgr.clearCallbackLog();
+    require('../lib/neural-cache').invalidatePrefix('callback:log');
+    res.json({ cleared: true });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // PROXY NODES (fluffy-barnacle-inspired)
+  // ════════════════════════════════════════════════════════════════════════
 
   // GET /api/proxy-nodes — list all nodes + tunnel status
   app.get('/api/proxy-nodes', requireRole('analyst'), (req, res) => {
