@@ -339,7 +339,7 @@ Views.docs = {
       '<p><strong>Q: How long does a scan take?</strong><br>A: Depends on file count. Preview first to check. Small projects (5-10 files): ~1 minute. Larger projects (30-50 files): 3-5 minutes. Each batch of files requires an AI call (~30-90 seconds).</p>' +
       '<p><strong>Q: Does this require AI to be configured?</strong><br>A: Yes. Code Audit uses the AI provider configured in Settings. It sends source code to the LLM for analysis. Ensure your AI provider is set up and working before running code audits.</p>' +
       '<p><strong>Q: What is the "Validate Exploitability" button?</strong><br>A: After a code audit completes, each finding has a <strong>Validate Exploitability</strong> button. Clicking it runs the Raptor 4-step MUST-GATE analysis on that specific finding: (1) Source Control &mdash; can an attacker control the input? (2) Sanitizer Effectiveness &mdash; can validation be bypassed? (3) Reachability &mdash; can the code path be triggered? (4) Impact &mdash; what is the worst case? The result shows a verdict badge (EXPLOITABLE in orange, FALSE_POSITIVE in cyan) with pass/fail for each step, attack vector, validated PoC, and reasoning. Takes ~60-90 seconds per finding.</p>' +
-      '<p><strong>Q: How do I use Validate Exploitability?</strong><br>A: (1) Run a code audit on any directory. (2) Wait for results. (3) Click a finding row to expand it. (4) Click the <strong>Validate Exploitability</strong> button (cyan border). (5) Wait ~90s. (6) Review the 4-step validation table and final verdict. Use this to separate real vulnerabilities from false positives before spending time on remediation.</p>' +
+      '<p><strong>Q: How do I use Validate Exploitability?</strong><br>A: Sidebar &rarr; <strong>Scanning</strong> &rarr; <strong>Code Audit</strong>. (1) Enter a directory path and click <strong>Run Code Audit</strong>. (2) Wait for scan to finish (progress bar shows phases). (3) In the results table, click any finding row to expand its details. (4) Click the <strong>Validate Exploitability</strong> button (cyan border, bottom of finding details). (5) Wait ~60-90s &mdash; a spinner shows "Running MUST-GATE exploitability validation." (6) Review: verdict badge (orange = exploitable, cyan = false positive), 4-step table with pass/fail per step, attack vector, PoC, and reasoning. Use this to triage real vulnerabilities from noise before spending time on fixes.</p>' +
 
       /* Proxy Nodes */
       '<h3 style="color:var(--cyan);margin:28px 0 8px;font-size:var(--font-size-lg);">Proxy Nodes (Ephemeral Infrastructure)</h3>' +
@@ -437,11 +437,12 @@ Views.docs = {
 
       '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">How to use:</p>' +
       '<ol style="padding-left:20px;list-style:decimal;">' +
-        '<li style="margin-bottom:4px;">Go to <strong>Intelligence &gt; Agents</strong></li>' +
-        '<li style="margin-bottom:4px;">Click the <strong>Hunters</strong> tab to find the 5 Raptor agents</li>' +
-        '<li style="margin-bottom:4px;">Click <strong>Run Agent</strong> on any Raptor agent</li>' +
-        '<li style="margin-bottom:4px;">Enter your target description in natural language</li>' +
-        '<li style="margin-bottom:4px;">Wait 30s-3min for analysis. Output appears with cyan border on success.</li>' +
+        '<li style="margin-bottom:4px;">Open sidebar &rarr; <strong>Agents</strong> group &rarr; click <strong>Security Agents</strong></li>' +
+        '<li style="margin-bottom:4px;">Click the <strong>Hunters</strong> tab to filter &mdash; all 5 Raptor agents are in this category</li>' +
+        '<li style="margin-bottom:4px;">Click the orange <strong>Run Agent</strong> button on any Raptor agent card</li>' +
+        '<li style="margin-bottom:4px;">Enter your target in the textarea &mdash; plain English describing code, app architecture, findings, or patches</li>' +
+        '<li style="margin-bottom:4px;">Click <strong>Run</strong>. Wait 30s-3min. Output appears below with cyan border on success.</li>' +
+        '<li style="margin-bottom:4px;">Scroll down to read the full analysis. Click <strong>History</strong> to see previous runs.</li>' +
       '</ol>' +
 
       '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">Example inputs for each agent:</p>' +
