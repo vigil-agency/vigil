@@ -410,20 +410,20 @@ body.sidebar-collapsed #topbar {
 
 /* ── Content Area ── */
 #content {
-  grid-area: content;
-  margin-left: var(--sidebar-width);
-  margin-top: var(--topbar-height);
-  margin-bottom: var(--statusbar-height);
+  position: fixed;
+  top: var(--topbar-height);
+  left: var(--sidebar-width);
+  right: 0;
+  bottom: var(--statusbar-height);
   padding: 20px;
   overflow-y: auto;
   overflow-x: hidden;
-  height: calc(100vh - var(--topbar-height) - var(--statusbar-height));
-  transition: margin-left 300ms ease-in-out;
+  transition: left 300ms ease-in-out;
 }
 
 #sidebar.collapsed ~ #content,
 body.sidebar-collapsed #content {
-  margin-left: var(--sidebar-collapsed);
+  left: var(--sidebar-collapsed);
 }
 
 .view-container {
@@ -623,7 +623,7 @@ body.sidebar-collapsed #statusbar {
   }
 
   #content {
-    margin-left: 0 !important;
+    left: 0 !important;
   }
 
   #statusbar {

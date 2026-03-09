@@ -404,6 +404,22 @@ const sessionCleanInterval = setInterval(() => {
   cleanExpired();
 }, 300000);
 
+// Intel feed refresh every 15 minutes
+const intelFeedsInterval = setInterval(async () => {
+  try {
+    const intel = require('./lib/intel-feeds');
+    await intel.refreshAllFeeds(io);
+  } catch {}
+}, 900000);
+// Initial feed refresh 30s after startup
+setTimeout(async () => {
+  try {
+    const intel = require('./lib/intel-feeds');
+    await intel.refreshAllFeeds(io);
+    console.log('  Intel feeds: initial refresh complete');
+  } catch {}
+}, 30000);
+
 // Graceful shutdown
 function shutdown(signal) {
   console.log('\n  Vigil shutting down (' + signal + ')...');
@@ -411,6 +427,7 @@ function shutdown(signal) {
   clearInterval(threatsInterval);
   clearInterval(postureInterval);
   clearInterval(sessionCleanInterval);
+  clearInterval(intelFeedsInterval);
 
   io.close();
   server.close(() => {

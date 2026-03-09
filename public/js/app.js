@@ -602,6 +602,12 @@
         Toast[level](data.message);
       }
     });
+
+    socket.on('intel_update', function(data) {
+      if (Views.knowledge && Views.knowledge.update) {
+        Views.knowledge.update(data);
+      }
+    });
   }
 
   function updateConnectionStatus(connected) {

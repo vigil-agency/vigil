@@ -9,8 +9,8 @@ Views.docs = {
         '<div class="section-title">Documentation</div>' +
       '</div>' +
 
-      '<div class="two-panel">' +
-        '<div class="two-panel-left glass-card" style="padding:12px;">' +
+      '<div class="two-panel" style="height:calc(100vh - var(--topbar-height) - var(--statusbar-height) - 100px);">' +
+        '<div class="two-panel-left glass-card" style="padding:12px;overflow-y:auto;">' +
           '<div style="font-weight:600;color:var(--text-primary);margin-bottom:12px;padding:0 8px;">Contents</div>' +
           '<div class="nav-item active doc-nav-item" data-doc="getting-started"><span class="nav-item-icon">&#9654;</span><span class="nav-item-label">Getting Started</span></div>' +
           '<div class="nav-item doc-nav-item" data-doc="overview"><span class="nav-item-icon">&#128200;</span><span class="nav-item-label">Overview Views</span></div>' +
@@ -27,7 +27,7 @@ Views.docs = {
           '<div class="nav-item doc-nav-item" data-doc="shortcuts"><span class="nav-item-icon">&#9000;</span><span class="nav-item-label">Keyboard Shortcuts</span></div>' +
         '</div>' +
 
-        '<div class="two-panel-right glass-card" id="docs-content" style="line-height:1.8;color:var(--text-secondary);font-size:var(--font-size-sm);">' +
+        '<div class="two-panel-right glass-card" id="docs-content" style="line-height:1.8;color:var(--text-secondary);font-size:var(--font-size-sm);overflow-y:auto;">' +
         '</div>' +
       '</div>';
 

@@ -126,31 +126,7 @@ Return ONLY a JSON object:
     res.json({ history: triaged });
   });
 
-  // ════════════════════════════════════════════════════════════════════════
-  // KNOWLEDGE BASE — /api/knowledge
-  // ════════════════════════════════════════════════════════════════════════
-  const KNOWLEDGE_PATH = path.join(DATA, 'knowledge.json');
-
-  app.get('/api/knowledge', requireAuth, (req, res) => {
-    const articles = readJSON(KNOWLEDGE_PATH, getDefaultKnowledge());
-    res.json({ articles });
-  });
-
-  app.post('/api/knowledge', requireRole('analyst'), (req, res) => {
-    const { title, content, category } = req.body;
-    if (!title || !content) return res.status(400).json({ error: 'title and content required' });
-
-    const articles = readJSON(KNOWLEDGE_PATH, []);
-    const article = {
-      id: crypto.randomUUID(),
-      title, content, category: category || 'general',
-      createdAt: new Date().toISOString(),
-      createdBy: req.user ? req.user.username : 'unknown',
-    };
-    articles.push(article);
-    writeJSON(KNOWLEDGE_PATH, articles);
-    res.json(article);
-  });
+  // Knowledge Base endpoints removed — replaced by Intel Hub (routes/intel-hub.js)
 
   // ════════════════════════════════════════════════════════════════════════
   // PLAYBOOKS — /api/playbooks
@@ -247,15 +223,6 @@ Return only valid JSON, no markdown.`;
 
 
 // ── Default data generators ─────────────────────────────────────────────
-
-function getDefaultKnowledge() {
-  return [
-    { id: '1', title: 'Getting Started with Vigil', content: 'Vigil is an AI-powered security operations platform. Start by running your first scan from the Port Scanner or Vulnerability Scanner views.', category: 'getting-started', createdAt: new Date().toISOString() },
-    { id: '2', title: 'Understanding Security Scores', content: 'The security posture score is calculated from system hardening, vulnerability scan results, threat detection, and incident response status. A score above 80 is considered good.', category: 'concepts', createdAt: new Date().toISOString() },
-    { id: '3', title: 'Scanner Installation', content: 'Install security scanners for full functionality:\n- nmap: sudo apt install nmap\n- nuclei: go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest\n- trivy: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh\n- nikto: sudo apt install nikto', category: 'setup', createdAt: new Date().toISOString() },
-    { id: '4', title: 'RBAC Roles', content: 'Vigil has three roles:\n- Admin: Full access including user management and settings\n- Analyst: Can run scans, manage incidents, write reports\n- Viewer: Read-only access to dashboards and reports', category: 'concepts', createdAt: new Date().toISOString() },
-  ];
-}
 
 function getDefaultPlaybooks() {
   return [
