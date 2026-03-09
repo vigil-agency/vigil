@@ -1,6 +1,6 @@
 /**
  * MCP Server Route — Model Context Protocol (Streamable HTTP)
- * Vigil Security — 34 tools, 7 resources, 8 prompts
+ * Vigil Security — 35 tools, 7 resources, 8 prompts
  *
  * SDK: @modelcontextprotocol/sdk v1.x
  * Transport: Streamable HTTP (stateless, one request = one connection)
@@ -30,7 +30,7 @@ module.exports = function (app, ctx) {
     });
 
     // ════════════════════════════════════════════════════════════════════════
-    // TOOLS (34)
+    // TOOLS (35)
     // ════════════════════════════════════════════════════════════════════════
 
     // 1. check_posture
@@ -803,6 +803,77 @@ Respond with valid JSON:
       }
     });
 
+    // 34. check_server_hardening (ServerKit-inspired)
+    server.tool('check_server_hardening', 'Run server hardening audit — SSH, firewall, IDS, kernel, file permissions (score/grade)', {
+      includeServices: z.boolean().default(false).describe('Also include service health status'),
+    }, async ({ includeServices }) => {
+      try {
+        if (os.platform() === 'win32') return { content: [{ type: 'text', text: JSON.stringify({ score: 0, message: 'Hardening audit requires Linux' }) }] };
+
+        const checks = [];
+        let totalPts = 0, earnedPts = 0;
+        async function chk(name, cat, weight, cmd, testFn) {
+          totalPts += weight;
+          try {
+            const r = await ctx.execCommand(cmd, { timeout: 5000 });
+            const result = testFn(r);
+            if (result.passed) earnedPts += weight;
+            checks.push({ name, category: cat, passed: result.passed, detail: result.detail, severity: result.severity || 'medium' });
+          } catch (e) {
+            checks.push({ name, category: cat, passed: false, detail: 'Check failed', severity: 'low' });
+          }
+        }
+
+        await chk('SSH root login disabled', 'ssh', 10,
+          'grep -i "^PermitRootLogin" /etc/ssh/sshd_config 2>/dev/null || echo "not-set"',
+          r => { const v = (r.stdout||'').trim().split(/\s+/)[1]||''; return { passed: v.toLowerCase()==='no', detail: 'PermitRootLogin='+v, severity:'high' }; });
+        await chk('SSH password auth disabled', 'ssh', 8,
+          'grep -i "^PasswordAuthentication" /etc/ssh/sshd_config 2>/dev/null || echo "not-set"',
+          r => { const v = (r.stdout||'').trim().split(/\s+/)[1]||''; return { passed: v.toLowerCase()==='no', detail: 'PasswordAuthentication='+v, severity:'high' }; });
+        await chk('Firewall active', 'firewall', 10,
+          'ufw status 2>/dev/null || firewall-cmd --state 2>/dev/null || echo "none"',
+          r => { const o = (r.stdout||'').toLowerCase(); const a = o.includes('status: active')||o.includes('running'); return { passed: a, detail: a?'Active':'Inactive', severity:'critical' }; });
+        await chk('Fail2ban running', 'ids', 8,
+          'systemctl is-active fail2ban 2>/dev/null || echo "inactive"',
+          r => { const a = (r.stdout||'').trim()==='active'; return { passed: a, detail: a?'Running':'Not running', severity:'medium' }; });
+        await chk('ASLR enabled', 'kernel', 6,
+          'cat /proc/sys/kernel/randomize_va_space 2>/dev/null || echo "0"',
+          r => { const v = (r.stdout||'').trim(); return { passed: v==='2', detail: 'Level '+v+' (2=full)', severity:'medium' }; });
+        await chk('/etc/shadow permissions', 'files', 7,
+          'stat -c "%a" /etc/shadow 2>/dev/null || echo "unknown"',
+          r => { const p = (r.stdout||'').trim(); return { passed: ['640','600','000'].includes(p), detail: 'Perms: '+p, severity:'high' }; });
+        await chk('No empty password accounts', 'accounts', 8,
+          'awk -F: \'($2 == "") {print $1}\' /etc/shadow 2>/dev/null || echo ""',
+          r => { const a = (r.stdout||'').trim().split('\n').filter(Boolean); return { passed: a.length===0||a[0]==='', detail: a.length&&a[0]?'Empty: '+a.join(','):'None', severity:'critical' }; });
+
+        const score = totalPts > 0 ? Math.round((earnedPts/totalPts)*100) : 0;
+        const grade = score>=90?'A':score>=80?'B':score>=70?'C':score>=50?'D':'F';
+        const result = { score, grade, checks, passed: checks.filter(c=>c.passed).length, failed: checks.filter(c=>!c.passed).length };
+
+        if (includeServices) {
+          try {
+            const svcNames = ['nginx','postgresql','docker','sshd','fail2ban','redis-server','cron'];
+            const svcs = [];
+            for (const name of svcNames) {
+              try {
+                const r = await ctx.execFileSafe('systemctl', ['is-active', name], { timeout: 3000 });
+                const st = (r.stdout||'').trim();
+                if (['active','inactive','failed'].includes(st)) svcs.push({ name, status: st });
+              } catch (e) {
+                const st = (e.stdout||'').trim();
+                if (st==='inactive'||st==='failed') svcs.push({ name, status: st });
+              }
+            }
+            result.services = svcs;
+          } catch {}
+        }
+
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      } catch (e) {
+        return { content: [{ type: 'text', text: 'Hardening check error: ' + e.message }], isError: true };
+      }
+    });
+
     // ════════════════════════════════════════════════════════════════════════
     // RESOURCES (7)
     // ════════════════════════════════════════════════════════════════════════
@@ -1037,7 +1108,7 @@ Respond with valid JSON:
       url: mcpUrl,
       transport: 'streamable-http',
       version: '1.0.0',
-      tools: 34,
+      tools: 35,
       resources: 7,
       prompts: 8,
       instructions: {

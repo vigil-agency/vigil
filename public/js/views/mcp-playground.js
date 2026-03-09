@@ -1,5 +1,5 @@
 /* Vigil v1.0 — MCP Playground (Model Context Protocol)
- * Interactive playground for 34 tools, 7 resources, 8 prompt workflows.
+ * Interactive playground for 35 tools, 7 resources, 8 prompt workflows.
  * All calls go through POST /api/mcp/test with {method, params}.
  */
 Views['mcp-playground'] = {
@@ -11,7 +11,7 @@ Views['mcp-playground'] = {
   _activeCategory: 'all',
   _connInfo: null,
 
-  // Tool category mapping (34 tools)
+  // Tool category mapping (35 tools)
   _categories: {
     check_posture: 'system', scan_ports: 'scanning', scan_vulnerabilities: 'scanning',
     check_ssl: 'scanning', query_logs: 'scanning', osint_domain: 'intelligence',
@@ -29,6 +29,7 @@ Views['mcp-playground'] = {
     create_tunnel: 'proxy', manage_callback_listener: 'proxy',
     check_ai_security: 'ai-security',
     autonomous_pentest: 'pentest',
+    check_server_hardening: 'system',
   },
   _catLabels: { all: 'All', scanning: 'Scanning', intelligence: 'Intelligence', compliance: 'Compliance', incident: 'Incident', system: 'System', 'code-audit': 'Code Audit', proxy: 'Proxy', adversarial: 'Adversarial', pentest: 'Pentest', 'purple-team': 'Purple Team', 'ai-security': 'AI Security' },
   _catIcons: { scanning: '&#128269;', intelligence: '&#128373;', compliance: '&#9989;', incident: '&#128680;', system: '&#9881;', 'code-audit': '&#128187;', proxy: '&#128279;', adversarial: '&#9876;', pentest: '&#128296;', 'purple-team': '&#9760;', 'ai-security': '&#129302;' },
@@ -139,7 +140,7 @@ Views['mcp-playground'] = {
         '<div class="glass-card-title" style="margin-bottom:12px;">Tool Explorer</div>' +
         '<div class="two-panel" style="min-height:400px;">' +
           '<div class="two-panel-left" style="overflow-y:auto;">' +
-            '<input type="text" class="form-input" id="mcp-tool-search" placeholder="Search 34 tools..." style="margin-bottom:8px;">' +
+            '<input type="text" class="form-input" id="mcp-tool-search" placeholder="Search 35 tools..." style="margin-bottom:8px;">' +
             '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;" id="mcp-cat-tabs"></div>' +
             '<div id="mcp-tool-list"><div class="loading-state"><div class="spinner spinner-sm"></div></div></div>' +
           '</div>' +
@@ -689,7 +690,7 @@ Views['mcp-playground'] = {
       body:
         '<div style="margin-bottom:16px;color:var(--text-secondary);font-size:var(--font-size-sm);">' +
           'Connect Claude Desktop, Claude Code, or any MCP client to Vigil\'s built-in MCP server. ' +
-          '<span style="color:var(--cyan);font-weight:600;">' + (info.tools || 34) + ' tools</span>, ' +
+          '<span style="color:var(--cyan);font-weight:600;">' + (info.tools || 35) + ' tools</span>, ' +
           '<span style="color:var(--cyan);">' + (info.resources || 3) + ' resources</span>, ' +
           '<span style="color:var(--cyan);">' + (info.prompts || 4) + ' prompts</span> available.' +
         '</div>' +

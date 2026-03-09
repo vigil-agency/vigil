@@ -84,7 +84,7 @@ pentest.js             -> Pentest command library + engagement management (Recon
 credentials.js         -> AES-256-GCM credential vault
 notifications.js       -> Notification system (email, webhook, Slack)
 settings.js            -> Platform configuration, user preferences
-mcp.js                 -> MCP server (Streamable HTTP, 34 tools, 7 resources, 8 prompts)
+mcp.js                 -> MCP server (Streamable HTTP, 35 tools, 7 resources, 8 prompts)
 health.js              -> Health check endpoint, service status
 code-audit.js          -> LLM-driven source code vulnerability scanning + binary analysis routes
 ephemeral-infra.js     -> Disposable proxy nodes + SSH tunnels + OOB callback listener (fluffy-barnacle + pgrok inspired)
@@ -211,7 +211,7 @@ public/
 ### Infrastructure
 | View | File | Description |
 |------|------|-------------|
-| Network | `views/network-map.js` | Visual network topology, service dependencies |
+| Network | `views/network.js` | Network interfaces, ports, firewall + Services tab + Hardening audit (ServerKit) |
 | Log Analysis | `views/log-analysis.js` | Log search and threat hunting |
 | Credentials | `views/credentials.js` | AES-256-GCM credential vault |
 | Notifications | `views/notifications.js` | Notification system management |
@@ -228,7 +228,7 @@ public/
 - Each customer's MCP server is isolated in their own container sandbox -- tenant-scoped, auth-gated.
 - SDK: `@modelcontextprotocol/sdk` + Zod schemas
 
-### Tools (34) — actual names from routes/mcp.js
+### Tools (35) — actual names from routes/mcp.js
 ```
 # System & Posture
 check_posture            -> Security posture score + grade breakdown
@@ -295,6 +295,9 @@ check_ai_security        -> AI/LLM security posture assessment (OWASP LLM Top 10
 
 # Autonomous Pentest (LuaN1aoAgent-inspired)
 autonomous_pentest       -> P-E-R autonomous pentest with dual causal graph reasoning
+
+# Infrastructure (ServerKit-inspired)
+check_server_hardening   -> Server hardening audit (SSH, firewall, IDS, kernel, files, score/grade)
 ```
 
 ### Resources
@@ -643,6 +646,17 @@ Users bring their own AI subscriptions. The app shells out to locally-installed 
 - Neural cache: `osint:reverse-ip:`, `osint:reputation:`, `osint:whois-history:`, `osint:ip-enhanced:` (10min TTL)
 - MCP tool: `osint_reverse_ip` (HackerTarget reverse IP, no key needed for free tier)
 - Lib: `lib/osint-engine.js` (reverseIPLookup, domainReputation, whoisHistory, ipLookupEnhanced, fetchText)
+
+### Server Hardening (jhd3197/ServerKit-inspired)
+- 3-tab Network view: Network (existing) | Services | Hardening
+- Service health: checks 27+ systemd services via `systemctl is-active/show`, status/PID/since, sorted active→failed→inactive
+- Hardening audit: 16 security checks across 7 categories (SSH, firewall, IDS, updates, files, kernel, accounts), score/100 with grade A-F
+- Fail2ban status: jail list with ban stats, failed login attempts via `lastb`
+- AI analysis: LLM generates hardening assessment with prioritized remediation
+- Neural cache: `system:services` (30s), `system:hardening` (5min), `system:fail2ban` (1min)
+- MCP tool: `check_server_hardening` (7 key checks, optional service status)
+- API: `GET /api/network/services`, `GET /api/network/hardening`, `GET /api/network/fail2ban`
+- Requires Linux/systemd for full results; graceful degradation on Windows/Docker
 
 ## Auth
 - PBKDF2 password hashing (lib/users.js)
