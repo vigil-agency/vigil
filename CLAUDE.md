@@ -84,7 +84,7 @@ pentest.js             -> Pentest command library + engagement management (Recon
 credentials.js         -> AES-256-GCM credential vault
 notifications.js       -> Notification system (email, webhook, Slack)
 settings.js            -> Platform configuration, user preferences
-mcp.js                 -> MCP server (Streamable HTTP, 35 tools, 7 resources, 8 prompts)
+mcp.js                 -> MCP server (Streamable HTTP, 36 tools, 7 resources, 8 prompts)
 health.js              -> Health check endpoint, service status
 code-audit.js          -> LLM-driven source code vulnerability scanning + binary analysis routes
 ephemeral-infra.js     -> Disposable proxy nodes + SSH tunnels + OOB callback listener (fluffy-barnacle + pgrok inspired)
@@ -197,7 +197,7 @@ public/
 ### Intelligence
 | View | File | Description |
 |------|------|-------------|
-| OSINT | `views/osint.js` | Web Recon, Username, Phone Intel tabs |
+| OSINT | `views/osint.js` | Domain, IP, Phone, Email Intel, Username, Web Recon tabs |
 | Findings | `views/findings.js` | All vulnerability findings, filtering, severity |
 | Attack Timeline | `views/timeline.js` | Incident timeline visualization, event correlation |
 
@@ -243,6 +243,7 @@ check_ssl                -> SSL/TLS certificate check (domain)
 osint_domain             -> Domain DNS reconnaissance (A, MX, NS)
 osint_ip                 -> IP geolocation lookup (ip-api.com)
 osint_reverse_ip         -> Reverse IP lookup — find all domains on same IP (WebOSINT)
+osint_email_check        -> Email registration check across 12 services (Holehe-inspired)
 triage_alert             -> AI alert triage (title, details, severity)
 hunt_threat              -> Threat hypothesis investigation (Linux evidence)
 
@@ -636,7 +637,18 @@ Users bring their own AI subscriptions. The app shells out to locally-installed 
 - Integrated as "Phone Intel" and "Username" tabs in existing OSINT view (no new sidebar items)
 - Username checks use stealth HTTP headers, run in parallel batches of 5, with rate limiting
 - AI analysis for both: digital footprint assessment (username) and carrier/region analysis (phone)
-- API: `POST /api/osint/username`, `POST /api/osint/phone`
+- API: `POST /api/osint/username`, `POST /api/osint/phone`, `POST /api/osint/email`
+
+### Email Intel (frishtik/osint-tools-mcp-server Holehe-inspired)
+- Email registration check across 12 online services (Gravatar, GitHub, Firefox, Spotify, Pinterest, Adobe, WordPress, Duolingo, Twitter, Tumblr, Last.fm, Patreon)
+- Email validation: MX records, SPF/DMARC analysis, disposable email detection (30+ throwaway domains), free vs custom/corporate provider classification
+- Integrated as "Email Intel" tab in existing OSINT view (7 tabs total, no new sidebar items)
+- Holehe-inspired HTTP probing: checks password-reset/signup/search endpoints per service
+- Batched service checks (4 at a time, 400ms delay) with stealth headers
+- Neural cache: `osint:email:` key with 10min TTL
+- MCP tool: `osint_email_check`
+- API: `POST /api/osint/email`
+- Socket.IO event: `email_check_progress`
 
 ### WebOSINT (C3n7ral051nt4g3ncy/WebOSINT-inspired)
 - Domain enrichment: reverse IP lookup (HackerTarget free API), domain reputation (WhoisXML), WHOIS history (WhoisFreaks)

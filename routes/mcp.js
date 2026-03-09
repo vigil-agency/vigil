@@ -1,6 +1,6 @@
 /**
  * MCP Server Route — Model Context Protocol (Streamable HTTP)
- * Vigil Security — 35 tools, 7 resources, 8 prompts
+ * Vigil Security — 36 tools, 7 resources, 8 prompts
  *
  * SDK: @modelcontextprotocol/sdk v1.x
  * Transport: Streamable HTTP (stateless, one request = one connection)
@@ -30,7 +30,7 @@ module.exports = function (app, ctx) {
     });
 
     // ════════════════════════════════════════════════════════════════════════
-    // TOOLS (35)
+    // TOOLS (36)
     // ════════════════════════════════════════════════════════════════════════
 
     // 1. check_posture
@@ -187,6 +187,38 @@ module.exports = function (app, ctx) {
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
         return { content: [{ type: 'text', text: 'Reverse IP error: ' + e.message }], isError: true };
+      }
+    });
+
+    // 7c. osint_email_check (Holehe-inspired)
+    server.tool('osint_email_check', 'Check email registration across 12+ services (Holehe-inspired) — validates MX/SPF/DMARC, detects disposable providers', {
+      email: z.string().describe('Email address to check'),
+    }, async ({ email }) => {
+      try {
+        const { checkEmailRegistration } = require('../lib/ghost-osint');
+        const result = await checkEmailRegistration(email);
+        if (result.error) {
+          return { content: [{ type: 'text', text: 'Error: ' + result.error }], isError: true };
+        }
+        const meta = result.meta || {};
+        const registered = result.results.filter(r => r.registered === true);
+        const notFound = result.results.filter(r => r.registered === false);
+        let text = 'Email: ' + result.email + '\n';
+        text += 'Domain: ' + meta.domain + ' (' + meta.providerType + ')\n';
+        text += 'Disposable: ' + (meta.isDisposable ? 'YES — SUSPICIOUS' : 'No') + '\n';
+        text += 'MX: ' + (meta.hasMX ? (meta.mxRecords || []).join(', ') : 'No MX records') + '\n';
+        text += 'SPF: ' + (meta.hasSPF ? 'Present' : 'Missing') + ' | DMARC: ' + (meta.hasDMARC ? 'Present' : 'Missing') + '\n\n';
+        text += 'Registration: ' + result.registered + ' found, ' + result.notRegistered + ' not found, ' + result.unknown + ' unknown (' + result.totalServices + ' checked)\n';
+        text += 'Duration: ' + (result.duration / 1000).toFixed(1) + 's\n\n';
+        if (registered.length) {
+          text += 'Registered on:\n' + registered.map(r => '  + ' + r.service + ' (' + r.category + ')').join('\n') + '\n\n';
+        }
+        if (notFound.length) {
+          text += 'Not found on:\n' + notFound.map(r => '  - ' + r.service).join('\n') + '\n';
+        }
+        return { content: [{ type: 'text', text }] };
+      } catch (e) {
+        return { content: [{ type: 'text', text: 'Email check failed: ' + e.message }], isError: true };
       }
     });
 
@@ -1108,7 +1140,7 @@ Respond with valid JSON:
       url: mcpUrl,
       transport: 'streamable-http',
       version: '1.0.0',
-      tools: 35,
+      tools: 36,
       resources: 7,
       prompts: 8,
       instructions: {

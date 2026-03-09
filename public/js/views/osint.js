@@ -13,6 +13,7 @@ Views.osint = {
         '<div class="tab-item active" data-tab="osint-domain">Domain Intel</div>' +
         '<div class="tab-item" data-tab="osint-ip">IP Lookup</div>' +
         '<div class="tab-item" data-tab="osint-phone">Phone Intel</div>' +
+        '<div class="tab-item" data-tab="osint-email">Email Intel</div>' +
         '<div class="tab-item" data-tab="osint-username">Username</div>' +
         '<div class="tab-item" data-tab="osint-recon">Web Recon</div>' +
         '<div class="tab-item" data-tab="osint-history">History</div>' +
@@ -102,6 +103,25 @@ Views.osint = {
         '</div>' +
       '</div>' +
 
+      // ── Email Intel Tab (Holehe-inspired) ──────────────────────────
+      '<div class="tab-content" id="osint-email">' +
+        '<div class="glass-card" style="margin-bottom:20px;">' +
+          '<div class="form-inline">' +
+            '<div class="form-group" style="flex:1;">' +
+              '<label class="form-label">Email Address</label>' +
+              '<input type="text" class="form-input" id="osint-email-input" placeholder="user@example.com">' +
+            '</div>' +
+            '<div class="form-group" style="align-self:flex-end;">' +
+              '<button class="btn btn-primary" id="osint-email-btn">Investigate</button>' +
+            '</div>' +
+          '</div>' +
+          '<div style="margin-top:6px;color:var(--text-tertiary);font-size:var(--font-size-xs);">Checks email registration across 12 services (Gravatar, GitHub, Spotify, Firefox, Pinterest, Adobe, WordPress, Duolingo, Twitter, Tumblr, Last.fm, Patreon). Also validates domain MX/SPF/DMARC and detects disposable emails.</div>' +
+        '</div>' +
+        '<div id="osint-email-results">' +
+          '<div class="empty-state"><div class="empty-state-icon">&#9993;</div><div class="empty-state-title">Email Intelligence</div><div class="empty-state-desc">Enter an email to check registration across services, validate domain security (MX, SPF, DMARC), detect disposable providers, and get AI analysis</div></div>' +
+        '</div>' +
+      '</div>' +
+
       // ── Web Recon Tab ──────────────────────────────────────────────
       '<div class="tab-content" id="osint-recon">' +
         '<div class="glass-card" style="margin-bottom:20px;">' +
@@ -175,6 +195,10 @@ Views.osint = {
     document.getElementById('osint-phone-btn').addEventListener('click', function() { self.lookupPhone(); });
     document.getElementById('osint-phone-input').addEventListener('keydown', function(e) {
       if (e.key === 'Enter') self.lookupPhone();
+    });
+    document.getElementById('osint-email-btn').addEventListener('click', function() { self.lookupEmail(); });
+    document.getElementById('osint-email-input').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') self.lookupEmail();
     });
     document.getElementById('osint-username-btn').addEventListener('click', function() { self.lookupUsername(); });
     document.getElementById('osint-username-input').addEventListener('keydown', function(e) {
@@ -725,6 +749,97 @@ Views.osint = {
       btn.textContent = 'Analyze';
       results.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#10007;</div><div class="empty-state-title">Analysis Failed</div><div class="empty-state-desc">Check server connection and try again</div></div>';
       Toast.error('Phone analysis failed');
+    });
+  },
+
+  // ── Email Registration Check (Holehe-inspired) ─────────────────────
+  lookupEmail: function() {
+    var email = document.getElementById('osint-email-input').value.trim();
+    if (!email) { Toast.warning('Enter an email address'); return; }
+
+    var btn = document.getElementById('osint-email-btn');
+    var results = document.getElementById('osint-email-results');
+    btn.disabled = true;
+    btn.textContent = 'Investigating...';
+    results.innerHTML = '<div class="loading-state"><div class="spinner spinner-lg"></div><div>Checking ' + escapeHtml(email) + ' across 12 services...<br><span style="color:var(--text-tertiary);font-size:var(--font-size-xs);">Email validation, registration probing, AI analysis — may take 15-30 seconds</span></div></div>';
+
+    fetch('/api/osint/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ email: email })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      btn.disabled = false;
+      btn.textContent = 'Investigate';
+      if (data.error) {
+        results.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#10007;</div><div class="empty-state-title">Error</div><div class="empty-state-desc">' + escapeHtml(data.error) + '</div></div>';
+        Toast.error(data.error);
+        return;
+      }
+
+      var html = '';
+      var meta = data.meta || {};
+
+      // AI Analysis
+      if (data.analysis) {
+        html += '<div class="glass-card" style="margin-bottom:16px;">' +
+          '<div class="glass-card-title" style="margin-bottom:8px;color:var(--cyan);">AI Email Intelligence</div>' +
+          '<div style="color:var(--text-secondary);font-size:var(--font-size-sm);line-height:1.7;white-space:pre-wrap;">' + escapeHtml(data.analysis) + '</div>' +
+          '</div>';
+      }
+
+      // Stat cards
+      var disposableColor = meta.isDisposable ? 'var(--orange)' : 'var(--cyan)';
+      html += '<div class="stat-grid" style="margin-bottom:16px;">' +
+        '<div class="stat-card"><div class="stat-card-label">Registered</div><div class="stat-card-value" style="color:' + (data.registered ? 'var(--orange)' : 'var(--text-tertiary)') + ';">' + data.registered + '</div></div>' +
+        '<div class="stat-card"><div class="stat-card-label">Not Found</div><div class="stat-card-value">' + data.notRegistered + '</div></div>' +
+        '<div class="stat-card"><div class="stat-card-label">Unknown</div><div class="stat-card-value" style="color:var(--text-tertiary);">' + data.unknown + '</div></div>' +
+        '<div class="stat-card"><div class="stat-card-label">Provider</div><div class="stat-card-value" style="font-size:var(--font-size-xs);color:' + disposableColor + ';">' + escapeHtml(meta.providerType || '--') + '</div></div>' +
+        '<div class="stat-card"><div class="stat-card-label">Has MX</div><div class="stat-card-value" style="color:' + (meta.hasMX ? 'var(--cyan)' : 'var(--orange)') + ';">' + (meta.hasMX ? 'Yes' : 'No') + '</div></div>' +
+        '<div class="stat-card"><div class="stat-card-label">Duration</div><div class="stat-card-value" style="font-size:var(--font-size-sm);">' + ((data.duration || 0) / 1000).toFixed(1) + 's</div></div>' +
+      '</div>';
+
+      // Email validation card
+      html += '<div class="glass-card" style="margin-bottom:16px;">' +
+        '<div class="glass-card-title" style="margin-bottom:8px;">Email Validation</div>' +
+        Views.osint.detailRow('Email', meta.email) +
+        Views.osint.detailRow('Domain', meta.domain) +
+        Views.osint.detailRow('Provider Type', meta.providerType) +
+        Views.osint.detailRow('Disposable', meta.isDisposable ? 'Yes \u2014 SUSPICIOUS' : 'No') +
+        Views.osint.detailRow('MX Records', (meta.mxRecords || []).join(', ') || 'None') +
+        Views.osint.detailRow('SPF', meta.hasSPF ? 'Present' : 'Missing') +
+        Views.osint.detailRow('DMARC', meta.hasDMARC ? 'Present' : 'Missing') +
+      '</div>';
+
+      // Service results table
+      var serviceResults = data.results || [];
+      if (serviceResults.length) {
+        html += '<div class="glass-card">' +
+          '<div class="glass-card-title" style="margin-bottom:8px;">Service Registration (Holehe-inspired)</div>' +
+          '<table class="data-table"><thead><tr><th>Service</th><th>Category</th><th>Status</th></tr></thead><tbody>';
+        serviceResults.forEach(function(r) {
+          var statusColor = r.registered === true ? 'var(--cyan)' : r.registered === false ? 'var(--text-tertiary)' : 'var(--text-secondary)';
+          var statusText = r.registered === true ? 'REGISTERED' : r.registered === false ? 'Not Found' : 'Unknown';
+          html += '<tr>' +
+            '<td style="color:var(--text-primary);font-weight:500;">' + escapeHtml(r.service) + '</td>' +
+            '<td><span class="tag" style="font-size:10px;">' + escapeHtml(r.category) + '</span></td>' +
+            '<td style="color:' + statusColor + ';font-weight:600;font-size:var(--font-size-xs);">' + statusText + '</td>' +
+            '</tr>';
+        });
+        html += '</tbody></table></div>';
+      }
+
+      results.innerHTML = html;
+      Toast.success('Email check complete: ' + data.registered + ' registrations found');
+      Views.osint.loadHistory();
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.textContent = 'Investigate';
+      results.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#10007;</div><div class="empty-state-title">Check Failed</div><div class="empty-state-desc">Check server connection and try again</div></div>';
+      Toast.error('Email check failed');
     });
   },
 

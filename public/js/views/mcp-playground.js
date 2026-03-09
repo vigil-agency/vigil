@@ -1,5 +1,5 @@
 /* Vigil v1.0 — MCP Playground (Model Context Protocol)
- * Interactive playground for 35 tools, 7 resources, 8 prompt workflows.
+ * Interactive playground for 36 tools, 7 resources, 8 prompt workflows.
  * All calls go through POST /api/mcp/test with {method, params}.
  */
 Views['mcp-playground'] = {
@@ -11,11 +11,11 @@ Views['mcp-playground'] = {
   _activeCategory: 'all',
   _connInfo: null,
 
-  // Tool category mapping (35 tools)
+  // Tool category mapping (36 tools)
   _categories: {
     check_posture: 'system', scan_ports: 'scanning', scan_vulnerabilities: 'scanning',
     check_ssl: 'scanning', query_logs: 'scanning', osint_domain: 'intelligence',
-    osint_ip: 'intelligence', osint_reverse_ip: 'intelligence',
+    osint_ip: 'intelligence', osint_reverse_ip: 'intelligence', osint_email_check: 'intelligence',
     triage_alert: 'intelligence', hunt_threat: 'intelligence',
     run_agent: 'system', launch_campaign: 'system', generate_report: 'compliance',
     compliance_check: 'compliance', list_findings: 'compliance', incident_create: 'incident',
@@ -140,7 +140,7 @@ Views['mcp-playground'] = {
         '<div class="glass-card-title" style="margin-bottom:12px;">Tool Explorer</div>' +
         '<div class="two-panel" style="min-height:400px;">' +
           '<div class="two-panel-left" style="overflow-y:auto;">' +
-            '<input type="text" class="form-input" id="mcp-tool-search" placeholder="Search 35 tools..." style="margin-bottom:8px;">' +
+            '<input type="text" class="form-input" id="mcp-tool-search" placeholder="Search 36 tools..." style="margin-bottom:8px;">' +
             '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;" id="mcp-cat-tabs"></div>' +
             '<div id="mcp-tool-list"><div class="loading-state"><div class="spinner spinner-sm"></div></div></div>' +
           '</div>' +

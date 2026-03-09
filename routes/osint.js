@@ -461,7 +461,7 @@ Assess: domain reputation, attack surface, potential risks, email security, host
   // ══════════════════════════════════════════════════════════════════════
   //  Ghost OSINT — Username enumeration + Phone intelligence
   // ══════════════════════════════════════════════════════════════════════
-  const { enumerateUsername, parsePhoneNumber } = require('../lib/ghost-osint');
+  const { enumerateUsername, parsePhoneNumber, checkEmailRegistration } = require('../lib/ghost-osint');
 
   // POST /api/osint/username — enumerate username across platforms
   app.post('/api/osint/username', requireRole('analyst'), async (req, res) => {
@@ -537,6 +537,55 @@ Provide: What region/carrier this likely belongs to, any notable characteristics
     } catch (e) {
       console.error('[OSINT] Phone error:', e.message);
       res.status(500).json({ error: 'Phone lookup failed: ' + e.message });
+    }
+  });
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  Email Registration Check — Holehe-inspired
+  // ══════════════════════════════════════════════════════════════════════
+
+  // POST /api/osint/email — check email registration across services
+  app.post('/api/osint/email', requireRole('analyst'), async (req, res) => {
+    const { email } = req.body;
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ error: 'email required' });
+    }
+
+    try {
+      const progressCb = ctx.io ? (p) => {
+        ctx.io.emit('email_check_progress', p);
+      } : null;
+
+      const result = await checkEmailRegistration(email.trim(), progressCb);
+      if (result.error) return res.status(400).json({ error: result.error });
+
+      // AI analysis
+      let analysis = null;
+      if (askAI && result.meta) {
+        try {
+          const meta = result.meta;
+          const registeredList = result.results.filter(r => r.registered === true).map(r => r.service + ' (' + r.category + ')').join(', ');
+          const prompt = `You are an OSINT analyst. Assess this email address's digital footprint and security posture (5-7 sentences).
+
+Email: ${email}
+Domain: ${meta.domain} (${meta.providerType})
+Disposable: ${meta.isDisposable ? 'YES — SUSPICIOUS' : 'No'}
+MX Records: ${(meta.mxRecords || []).join(', ') || 'None'}
+SPF: ${meta.hasSPF ? 'Present' : 'Missing'} | DMARC: ${meta.hasDMARC ? 'Present' : 'Missing'}
+Registered on ${result.registered}/${result.totalServices} services: ${registeredList || 'none detected'}
+Not found on: ${result.notRegistered}, Unknown: ${result.unknown}
+
+Assess: What does the registration pattern reveal about this person (professional, personal, active user)? Is the email domain trustworthy? Are SPF/DMARC properly configured? Any OPSEC observations or red flags? What additional OSINT investigation steps would you recommend?`;
+          analysis = await askAI(prompt, { timeout: 20000 });
+        } catch { /* AI optional */ }
+      }
+
+      result.analysis = analysis;
+      saveToHistory('email', email.trim(), result.registered + '/' + result.totalServices + ' services, ' + result.meta.providerType);
+      res.json(result);
+    } catch (e) {
+      console.error('[OSINT] Email error:', e.message);
+      res.status(500).json({ error: 'Email check failed: ' + e.message });
     }
   });
 
