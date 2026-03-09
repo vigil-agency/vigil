@@ -135,71 +135,77 @@ public/
     views/                   -> 37 self-registering view modules
 ```
 
-## 37 Sidebar Views
+## 37 Sidebar Views (ordered by sidebar position)
 
-### Overview
+### AI & Intel (top of sidebar — primary tools)
 | View | File | Description |
 |------|------|-------------|
-| Dashboard | `views/dashboard.js` | Security posture score, active threats, recent scans, alert summary |
-| Metrics | `views/metrics.js` | System resource metrics (CPU, memory, disk, network) |
-| Threat Map | `views/threat-map.js` | Live threat visualization, geographic attack origins |
+| AI Terminal | `views/ai-terminal.js` | Claude CLI terminal for AI-powered security analysis |
+| AI Chat | `views/ai-chat.js` | Conversational AI security assistant |
+| Knowledge Base | `views/knowledge.js` | Security knowledge management |
+| MCP Playground | `views/mcp.js` | MCP tool testing, prompt library, 9 category tabs |
+
+### Agents (second sidebar group)
+| View | File | Description |
+|------|------|-------------|
+| Security Agents | `views/agents.js` | 24 security agents with "Try:" example buttons |
+| Campaigns | `views/campaigns.js` | Multi-agent campaign orchestration |
+| Pentest | `views/pentest.js` | Pentest project management, findings, evidence |
+| Playbooks | `views/playbooks.js` | Incident response playbook management |
+
+### Workspace (third sidebar group)
+| View | File | Description |
+|------|------|-------------|
+| Calendar | `views/calendar.js` | Security operations calendar |
+| Notes | `views/notes.js` | Investigation notes and documentation |
+| Git | `views/git.js` | Git repository management |
+| GitHub Hub | `views/github-hub.js` | GitHub integration hub |
+
+### Threat Operations
+| View | File | Description |
+|------|------|-------------|
+| Dashboard | `views/dashboard.js` | Security posture score, active threats, recent scans |
+| Threat Feed | `views/threat-intel.js` | Threat feeds, IOC matching, adversary profiles |
+| Alert Triage | `views/alerts.js` | Alert rule configuration, notification channels |
+| Threat Hunt | `views/threat-map.js` | Live threat visualization, geographic origins |
 
 ### Scanning
 | View | File | Description |
 |------|------|-------------|
-| Network Scan | `views/network-scan.js` | Nmap port scanning, host discovery, service detection |
-| Vuln Scan | `views/vuln-scan.js` | Nuclei vulnerability scanning with template selection |
-| Container Scan | `views/container-scan.js` | Trivy image/filesystem scanning, SBOM generation |
+| Port Scanner | `views/network-scan.js` | Nmap port scanning, host discovery, service detection |
+| Vuln Scanner | `views/vuln-scan.js` | Nuclei vulnerability scanning with template selection |
 | Web Scanner | `views/web-scanner.js` | Web scanning + WAF Detection tab (30+ WAF signatures) |
-| SSL Audit | `views/ssl-audit.js` | OpenSSL certificate chain analysis, cipher suite grading |
-| DNS Recon | `views/dns-recon.js` | DNS enumeration, zone transfer, WHOIS lookup |
+| Container Security | `views/container-scan.js` | Trivy image/filesystem scanning, SBOM generation |
+| SSL Monitor | `views/ssl-audit.js` | OpenSSL certificate chain analysis, cipher suite grading |
 | DNS Security | `views/dns-security.js` | DNS security analysis, DNSSEC validation |
 | Code Audit | `views/code-audit.js` | LLM-driven source code vulnerability scanning |
 | Proxy Nodes | `views/proxy-nodes.js` | Disposable Codespace proxies for anonymous scanning |
-| Scan History | `views/scan-history.js` | All scan results, filtering, comparison, export |
-| Scheduled Scans | `views/scheduled-scans.js` | Cron-based recurring scan configuration |
-
-### Vulnerabilities
-| View | File | Description |
-|------|------|-------------|
-| CVE Tracker | `views/cve-tracker.js` | CVE database search, affected assets, CVSS scoring |
-| Vuln Dashboard | `views/vuln-dashboard.js` | Vulnerability trends, severity breakdown, SLA tracking |
-| Remediation | `views/remediation.js` | Fix recommendations, patch tracking, AI-assisted guidance |
-
-### Compliance
-| View | File | Description |
-|------|------|-------------|
-| Compliance | `views/compliance.js` | Framework selection (SOC2, PCI-DSS, HIPAA, ISO27001) |
-| Policy Editor | `views/policy-editor.js` | Security policy CRUD, enforcement rules |
-| Audit Log | `views/audit-log.js` | Immutable audit trail, filtering, export |
-
-### Incidents
-| View | File | Description |
-|------|------|-------------|
-| Incidents | `views/incidents.js` | Incident response workflow, severity, assignment |
-| Timeline | `views/timeline.js` | Incident timeline visualization, event correlation |
-| Postmortem | `views/postmortem.js` | Post-incident review, lessons learned, AI summary |
-
-### Assets
-| View | File | Description |
-|------|------|-------------|
-| Assets | `views/assets.js` | Asset inventory, tags, risk scoring |
-| Network Map | `views/network-map.js` | Visual network topology, service dependencies |
-| Docker | `views/docker.js` | Container listing, security posture, image vulnerabilities |
 
 ### Intelligence
 | View | File | Description |
 |------|------|-------------|
-| Threat Intel | `views/threat-intel.js` | Threat feeds, IOC matching, adversary profiles |
-| Pentest | `views/pentest.js` | Pentest project management, findings, evidence |
-| Reports | `views/reports.js` | Report generation (PDF/JSON/CSV), templates, scheduling |
+| OSINT | `views/osint.js` | Web Recon, Username, Phone Intel tabs |
+| Findings | `views/findings.js` | All vulnerability findings, filtering, severity |
+| Attack Timeline | `views/timeline.js` | Incident timeline visualization, event correlation |
+
+### Compliance
+| View | File | Description |
+|------|------|-------------|
+| Frameworks | `views/compliance.js` | SOC2, PCI-DSS, HIPAA, ISO27001, NIST |
+| Reports | `views/reports.js` | Report generation (PDF/JSON/CSV), scheduling |
+| Audit Log | `views/audit-log.js` | Immutable audit trail, filtering, export |
+
+### Infrastructure
+| View | File | Description |
+|------|------|-------------|
+| Network | `views/network-map.js` | Visual network topology, service dependencies |
+| Log Analysis | `views/log-analysis.js` | Log search and threat hunting |
+| Credentials | `views/credentials.js` | AES-256-GCM credential vault |
+| Notifications | `views/notifications.js` | Notification system management |
 
 ### System
 | View | File | Description |
 |------|------|-------------|
-| Terminal | `views/terminal.js` | Embedded terminal for manual scanner commands |
-| Alerts | `views/alerts.js` | Alert rule configuration, notification channels |
-| MCP Server | `views/mcp.js` | MCP playground, tool testing, prompt library |
 | Settings | `views/settings.js` | User management, AI provider, scanner paths, 2FA |
 | Docs/FAQ | `views/docs.js` | Getting started guide, FAQ, troubleshooting |
 
