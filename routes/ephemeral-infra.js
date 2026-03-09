@@ -23,6 +23,23 @@ module.exports = function (app, ctx) {
     }
   });
 
+  // POST /api/proxy-nodes/auth — authenticate gh CLI with a PAT (non-interactive)
+  app.post('/api/proxy-nodes/auth', requireRole('admin'), async (req, res) => {
+    const { token } = req.body;
+    if (!token || typeof token !== 'string' || token.length < 10) {
+      return res.status(400).json({ error: 'A valid GitHub Personal Access Token is required' });
+    }
+    try {
+      await proxy.authenticateWithToken(token.trim());
+      const auth = await proxy.checkGHAuth();
+      require('../lib/neural-cache').invalidate('proxy:nodes');
+      if (io) io.emit('proxy_node_update', { action: 'authenticated' });
+      res.json({ success: true, auth });
+    } catch (e) {
+      res.status(500).json({ error: 'Authentication failed: ' + e.message });
+    }
+  });
+
   // POST /api/proxy-nodes/sync — sync with actual Codespace state
   app.post('/api/proxy-nodes/sync', requireRole('analyst'), async (req, res) => {
     try {

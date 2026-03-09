@@ -69,9 +69,11 @@ COPY data/ ./data/
 COPY docs/ ./docs/
 COPY public/ ./public/
 
-RUN mkdir -p /app/data/reports /app/data/backups && chown -R vigil:vigil /app
+RUN mkdir -p /app/data/reports /app/data/backups /home/vigil/.config/gh && \
+    chown -R vigil:vigil /app /home/vigil
 
 ENV VIGIL_PORT=4100
+ENV HOME=/home/vigil
 
 EXPOSE 4100
 

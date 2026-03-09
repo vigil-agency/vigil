@@ -143,13 +143,53 @@ Views['proxy-nodes'] = {
         '<span style="color:var(--text-tertiary);">Codespaces use GitHub\'s free tier (120 core-hours/month). Each node provides a unique disposable exit IP for anonymous scanning.</span>' +
       '</div>';
     } else if (!authOk) {
-      html += '<div style="margin-top:10px;padding:10px;border-radius:6px;background:rgba(255,107,43,0.08);border:1px solid rgba(255,107,43,0.15);color:var(--text-secondary);font-size:var(--font-size-sm);">' +
+      html += '<div style="margin-top:10px;padding:10px;border-radius:6px;background:rgba(255,107,43,0.08);border:1px solid rgba(255,107,43,0.15);color:var(--text-secondary);font-size:var(--font-size-sm);line-height:1.8;">' +
         '<strong style="color:var(--orange);">Authentication Required</strong><br>' +
-        'Run: <code style="color:var(--cyan);">gh auth login</code> to authenticate with GitHub' +
+        'Enter a GitHub Personal Access Token with <code style="color:var(--cyan);">codespace</code> scope.' +
+        '<div style="display:flex;gap:8px;margin-top:8px;align-items:center;">' +
+          '<input type="password" id="proxy-gh-token" class="form-input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" style="flex:1;font-family:var(--font-mono);font-size:var(--font-size-xs);">' +
+          '<button class="btn btn-primary btn-sm" id="proxy-auth-btn">Authenticate</button>' +
+        '</div>' +
+        '<div style="margin-top:6px;color:var(--text-tertiary);font-size:var(--font-size-xs);">Create a token at <a href="https://github.com/settings/tokens" target="_blank" rel="noopener" style="color:var(--cyan);">github.com/settings/tokens</a> &mdash; needs <strong>codespace</strong> scope (or classic token with <strong>codespace</strong> checkbox).</div>' +
       '</div>';
     }
 
     el.innerHTML = html;
+
+    // Bind auth button if present
+    var authBtn = document.getElementById('proxy-auth-btn');
+    if (authBtn) {
+      var self = this;
+      authBtn.addEventListener('click', function() {
+        var tokenInput = document.getElementById('proxy-gh-token');
+        var token = tokenInput ? tokenInput.value.trim() : '';
+        if (!token) { Toast.warning('Paste your GitHub token first'); return; }
+        authBtn.disabled = true;
+        authBtn.textContent = 'Authenticating...';
+        fetch('/api/proxy-nodes/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ token: token }),
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.error) {
+            Toast.error(data.error);
+            authBtn.disabled = false;
+            authBtn.textContent = 'Authenticate';
+          } else {
+            Toast.success('Authenticated as ' + (data.auth && data.auth.user ? data.auth.user : 'GitHub user'));
+            self.show();
+          }
+        })
+        .catch(function(e) {
+          Toast.error('Auth failed: ' + e.message);
+          authBtn.disabled = false;
+          authBtn.textContent = 'Authenticate';
+        });
+      });
+    }
   },
 
   renderNodes: function(data) {
