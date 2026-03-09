@@ -3,7 +3,7 @@
 ## Overview
 AI-powered security operations platform. Express.js + Socket.IO on port 4100.
 Vanilla JS frontend — no React, no build step, no bundler.
-~33 route modules | ~18 libs | 37 views | 200+ endpoints | 6 npm deps.
+~33 route modules | ~19 libs | 37 views | 200+ endpoints | 6 npm deps.
 License: AGPL-3.0
 
 ## Quick Start
@@ -112,6 +112,7 @@ neural-cache.js        -> Intelligent caching layer
 code-audit.js          -> LLM-driven code vulnerability scanner (7 vuln types, confidence scoring)
 ephemeral-proxy.js     -> Disposable Codespace proxy management (SOCKS5 tunnels, lifecycle)
 web-recon.js           -> Scrapy-inspired web crawler (surface scan, exposed files, tech fingerprint)
+ghost-osint.js         -> Username enumeration (26 platforms) + phone number intelligence (70+ countries)
 ```
 
 ### Frontend (ViewRegistry pattern)
@@ -487,6 +488,14 @@ Users bring their own AI subscriptions. The app shells out to locally-installed 
 - Integrated as "Web Recon" tab in existing OSINT view (no new sidebar item)
 - AI analysis endpoint generates pentest-grade security assessments
 - API: `POST /api/osint/recon` (accepts `stealth:true`, `spiderType:"threat-intel"`), `GET /api/osint/recon/:id`, `GET /api/osint/recon`, `POST /api/osint/recon/:id/analyze`
+
+### Ghost OSINT (GhostTrack-inspired)
+- Username enumeration across 26 platforms (GitHub, GitLab, Reddit, HackerNews, Twitch, YouTube, Steam, npm, PyPI, etc.)
+- Phone number intelligence with E.164 country code parsing (70+ countries), line type detection, format validation
+- Integrated as "Phone Intel" and "Username" tabs in existing OSINT view (no new sidebar items)
+- Username checks use stealth HTTP headers, run in parallel batches of 5, with rate limiting
+- AI analysis for both: digital footprint assessment (username) and carrier/region analysis (phone)
+- API: `POST /api/osint/username`, `POST /api/osint/phone`
 
 ## Auth
 - PBKDF2 password hashing (lib/users.js)

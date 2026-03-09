@@ -12,8 +12,10 @@ Views.osint = {
       '<div class="tab-bar" id="osint-tabs">' +
         '<div class="tab-item active" data-tab="osint-domain">Domain Intel</div>' +
         '<div class="tab-item" data-tab="osint-ip">IP Lookup</div>' +
-        '<div class="tab-item" data-tab="osint-history">History</div>' +
+        '<div class="tab-item" data-tab="osint-phone">Phone Intel</div>' +
+        '<div class="tab-item" data-tab="osint-username">Username</div>' +
         '<div class="tab-item" data-tab="osint-recon">Web Recon</div>' +
+        '<div class="tab-item" data-tab="osint-history">History</div>' +
       '</div>' +
 
       // ── Domain Tab ──────────────────────────────────────────────────
@@ -59,6 +61,44 @@ Views.osint = {
           '<div id="osint-history-list">' +
             '<div class="empty-state"><div class="empty-state-icon">&#128339;</div><div class="empty-state-title">No History</div><div class="empty-state-desc">Investigations will appear here</div></div>' +
           '</div>' +
+        '</div>' +
+      '</div>' +
+
+      // ── Phone Intel Tab ────────────────────────────────────────────
+      '<div class="tab-content" id="osint-phone">' +
+        '<div class="glass-card" style="margin-bottom:20px;">' +
+          '<div class="form-inline">' +
+            '<div class="form-group" style="flex:1;">' +
+              '<label class="form-label">Phone Number</label>' +
+              '<input type="text" class="form-input" id="osint-phone-input" placeholder="+1 555 123 4567">' +
+            '</div>' +
+            '<div class="form-group" style="align-self:flex-end;">' +
+              '<button class="btn btn-primary" id="osint-phone-btn">Analyze</button>' +
+            '</div>' +
+          '</div>' +
+          '<div style="margin-top:6px;color:var(--text-tertiary);font-size:var(--font-size-xs);">Include country code (e.g. +1 for US, +44 for UK, +91 for India). Supports 70+ countries.</div>' +
+        '</div>' +
+        '<div id="osint-phone-results">' +
+          '<div class="empty-state"><div class="empty-state-icon">&#128222;</div><div class="empty-state-title">Phone Intelligence</div><div class="empty-state-desc">Enter a phone number to identify country, carrier type, format validation, and AI analysis</div></div>' +
+        '</div>' +
+      '</div>' +
+
+      // ── Username Tab ────────────────────────────────────────────────
+      '<div class="tab-content" id="osint-username">' +
+        '<div class="glass-card" style="margin-bottom:20px;">' +
+          '<div class="form-inline">' +
+            '<div class="form-group" style="flex:1;">' +
+              '<label class="form-label">Username</label>' +
+              '<input type="text" class="form-input" id="osint-username-input" placeholder="johndoe">' +
+            '</div>' +
+            '<div class="form-group" style="align-self:flex-end;">' +
+              '<button class="btn btn-primary" id="osint-username-btn">Enumerate</button>' +
+            '</div>' +
+          '</div>' +
+          '<div style="margin-top:6px;color:var(--text-tertiary);font-size:var(--font-size-xs);">Checks 26 platforms: GitHub, GitLab, Reddit, HackerNews, Twitch, YouTube, Steam, npm, PyPI, Docker Hub, Medium, and more.</div>' +
+        '</div>' +
+        '<div id="osint-username-results">' +
+          '<div class="empty-state"><div class="empty-state-icon">&#128100;</div><div class="empty-state-title">Username Enumeration</div><div class="empty-state-desc">Enter a username to search across 26 social, dev, gaming, and content platforms</div></div>' +
         '</div>' +
       '</div>' +
 
@@ -131,6 +171,14 @@ Views.osint = {
     document.getElementById('osint-ip-btn').addEventListener('click', function() { self.lookupIP(); });
     document.getElementById('osint-ip-input').addEventListener('keydown', function(e) {
       if (e.key === 'Enter') self.lookupIP();
+    });
+    document.getElementById('osint-phone-btn').addEventListener('click', function() { self.lookupPhone(); });
+    document.getElementById('osint-phone-input').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') self.lookupPhone();
+    });
+    document.getElementById('osint-username-btn').addEventListener('click', function() { self.lookupUsername(); });
+    document.getElementById('osint-username-input').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') self.lookupUsername();
     });
     document.getElementById('recon-start-btn').addEventListener('click', function() { self.startRecon(); });
     document.getElementById('recon-target').addEventListener('keydown', function(e) {
@@ -484,6 +532,152 @@ Views.osint = {
       btn.textContent = 'Investigate';
       results.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#10007;</div><div class="empty-state-title">Investigation Failed</div><div class="empty-state-desc">Check server connection and try again</div></div>';
       Toast.error('IP lookup failed');
+    });
+  },
+
+  // ── Phone Intelligence ──────────────────────────────────────────────
+  lookupPhone: function() {
+    var phone = document.getElementById('osint-phone-input').value.trim();
+    if (!phone) { Toast.warning('Enter a phone number'); return; }
+
+    var btn = document.getElementById('osint-phone-btn');
+    var results = document.getElementById('osint-phone-results');
+    btn.disabled = true;
+    btn.textContent = 'Analyzing...';
+    results.innerHTML = '<div class="loading-state"><div class="spinner spinner-lg"></div><div>Analyzing ' + escapeHtml(phone) + '...</div></div>';
+
+    fetch('/api/osint/phone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ phone: phone })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      btn.disabled = false;
+      btn.textContent = 'Analyze';
+      if (data.error && !data.countryCode) {
+        results.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#10007;</div><div class="empty-state-title">Error</div><div class="empty-state-desc">' + escapeHtml(data.error) + '</div></div>';
+        Toast.error(data.error);
+        return;
+      }
+
+      var html = '';
+
+      // AI Analysis
+      if (data.analysis) {
+        html += '<div class="glass-card" style="margin-bottom:16px;">' +
+          '<div class="glass-card-title" style="margin-bottom:8px;color:var(--cyan);">AI Analysis</div>' +
+          '<div style="color:var(--text-secondary);font-size:var(--font-size-sm);line-height:1.7;white-space:pre-wrap;">' + escapeHtml(data.analysis) + '</div>' +
+          '</div>';
+      }
+
+      // Stat cards
+      var validColor = data.valid ? 'var(--cyan)' : 'var(--orange)';
+      html += '<div class="stat-grid" style="margin-bottom:16px;">' +
+        '<div class="stat-card"><div class="stat-card-label">Country</div><div class="stat-card-value" style="font-size:var(--font-size-sm);">' + escapeHtml(data.country || 'Unknown') + '</div></div>' +
+        '<div class="stat-card"><div class="stat-card-label">Country Code</div><div class="stat-card-value" style="color:var(--cyan);">' + escapeHtml(data.countryCode || '?') + '</div></div>' +
+        '<div class="stat-card"><div class="stat-card-label">Line Type</div><div class="stat-card-value" style="font-size:var(--font-size-sm);color:var(--cyan);">' + escapeHtml((data.lineType || 'unknown').replace(/_/g, ' ')) + '</div></div>' +
+        '<div class="stat-card"><div class="stat-card-label">Valid Format</div><div class="stat-card-value" style="color:' + validColor + ';">' + (data.valid ? 'Yes' : 'No') + '</div></div>' +
+      '</div>';
+
+      // Details
+      html += '<div class="glass-card" style="margin-bottom:16px;">' +
+        '<div class="glass-card-title" style="margin-bottom:8px;">Number Details</div>' +
+        Views.osint.detailRow('Input', data.input) +
+        Views.osint.detailRow('E.164', data.e164) +
+        Views.osint.detailRow('International', data.international) +
+        Views.osint.detailRow('National', data.national) +
+        Views.osint.detailRow('ISO Code', data.iso) +
+        Views.osint.detailRow('Number Length', data.numberLength + (data.expectedLengths ? ' (expected: ' + data.expectedLengths.join(' or ') + ')' : '')) +
+        '</div>';
+
+      results.innerHTML = html;
+      Toast.success('Phone analysis complete');
+      Views.osint.loadHistory();
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.textContent = 'Analyze';
+      results.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#10007;</div><div class="empty-state-title">Analysis Failed</div><div class="empty-state-desc">Check server connection and try again</div></div>';
+      Toast.error('Phone analysis failed');
+    });
+  },
+
+  // ── Username Enumeration ───────────────────────────────────────────
+  lookupUsername: function() {
+    var username = document.getElementById('osint-username-input').value.trim();
+    if (!username) { Toast.warning('Enter a username'); return; }
+
+    var btn = document.getElementById('osint-username-btn');
+    var results = document.getElementById('osint-username-results');
+    btn.disabled = true;
+    btn.textContent = 'Enumerating...';
+    results.innerHTML = '<div class="loading-state"><div class="spinner spinner-lg"></div><div>Checking ' + escapeHtml(username) + ' across 26 platforms...<br><span style="color:var(--text-tertiary);font-size:var(--font-size-xs);">This may take 10-15 seconds</span></div></div>';
+
+    fetch('/api/osint/username', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ username: username })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      btn.disabled = false;
+      btn.textContent = 'Enumerate';
+      if (data.error) {
+        results.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#10007;</div><div class="empty-state-title">Error</div><div class="empty-state-desc">' + escapeHtml(data.error) + '</div></div>';
+        Toast.error(data.error);
+        return;
+      }
+
+      var html = '';
+
+      // AI Analysis
+      if (data.analysis) {
+        html += '<div class="glass-card" style="margin-bottom:16px;">' +
+          '<div class="glass-card-title" style="margin-bottom:8px;color:var(--cyan);">AI Digital Footprint Analysis</div>' +
+          '<div style="color:var(--text-secondary);font-size:var(--font-size-sm);line-height:1.7;white-space:pre-wrap;">' + escapeHtml(data.analysis) + '</div>' +
+          '</div>';
+      }
+
+      // Stat cards
+      html += '<div class="stat-grid" style="margin-bottom:16px;">' +
+        '<div class="stat-card"><div class="stat-card-label">Username</div><div class="stat-card-value" style="font-size:var(--font-size-sm);color:var(--cyan);">' + escapeHtml(data.username) + '</div></div>' +
+        '<div class="stat-card"><div class="stat-card-label">Found</div><div class="stat-card-value" style="color:' + (data.found ? 'var(--orange)' : 'var(--text-tertiary)') + ';">' + data.found + '</div></div>' +
+        '<div class="stat-card"><div class="stat-card-label">Not Found</div><div class="stat-card-value">' + data.notFound + '</div></div>' +
+        '<div class="stat-card"><div class="stat-card-label">Errors</div><div class="stat-card-value" style="color:' + (data.errors ? 'var(--orange)' : 'var(--text-tertiary)') + ';">' + data.errors + '</div></div>' +
+        '<div class="stat-card"><div class="stat-card-label">Duration</div><div class="stat-card-value" style="font-size:var(--font-size-sm);">' + ((data.duration || 0) / 1000).toFixed(1) + 's</div></div>' +
+      '</div>';
+
+      // Platform results table
+      var platformResults = data.results || [];
+      if (platformResults.length) {
+        html += '<div class="glass-card">' +
+          '<div class="glass-card-title" style="margin-bottom:8px;">Platform Results</div>' +
+          '<table class="data-table"><thead><tr><th>Platform</th><th>Category</th><th>Status</th><th>Profile</th></tr></thead><tbody>';
+        platformResults.forEach(function(r) {
+          var statusColor = r.found ? 'var(--cyan)' : r.statusCode === 0 ? 'var(--text-tertiary)' : 'var(--text-secondary)';
+          var statusText = r.found ? 'FOUND' : r.statusCode === 0 ? 'Error' : 'Not Found';
+          html += '<tr>' +
+            '<td style="color:var(--text-primary);font-weight:500;">' + escapeHtml(r.platform) + '</td>' +
+            '<td><span class="tag" style="font-size:10px;">' + escapeHtml(r.category) + '</span></td>' +
+            '<td style="color:' + statusColor + ';font-weight:600;font-size:var(--font-size-xs);">' + statusText + '</td>' +
+            '<td>' + (r.found ? '<a href="' + escapeHtml(r.url) + '" target="_blank" rel="noopener" style="color:var(--cyan);font-size:var(--font-size-xs);text-decoration:none;">View Profile &rarr;</a>' : '<span style="color:var(--text-tertiary);font-size:var(--font-size-xs);">--</span>') + '</td>' +
+            '</tr>';
+        });
+        html += '</tbody></table></div>';
+      }
+
+      results.innerHTML = html;
+      Toast.success('Username enumeration complete: ' + data.found + '/' + data.total + ' platforms');
+      Views.osint.loadHistory();
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.textContent = 'Enumerate';
+      results.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#10007;</div><div class="empty-state-title">Enumeration Failed</div><div class="empty-state-desc">Check server connection and try again</div></div>';
+      Toast.error('Username enumeration failed');
     });
   },
 

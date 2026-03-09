@@ -564,8 +564,27 @@ Views.docs = {
         '<li><strong>AI Security Assessment</strong> &mdash; Risk analysis based on open ports, geolocation, and network data.</li>' +
       '</ul>' +
 
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">Phone Intel Tab (GhostTrack-inspired):</p>' +
+      '<p>Phone number intelligence using E.164 country code parsing. Enter a number with country code (e.g. +1 555 123 4567) to get:</p>' +
+      '<ul style="padding-left:20px;list-style:disc;">' +
+        '<li><strong>Country &amp; Region</strong> &mdash; Identifies country from calling code (70+ countries supported).</li>' +
+        '<li><strong>Line Type</strong> &mdash; Detects mobile vs fixed line vs toll-free for major countries (US, UK, India, Germany, France, Australia, Brazil, Japan, South Korea, China).</li>' +
+        '<li><strong>Format Validation</strong> &mdash; Checks number length against expected format, outputs E.164, international, and national formats.</li>' +
+        '<li><strong>AI Analysis</strong> &mdash; Carrier range identification, OSINT significance, and red flag detection.</li>' +
+      '</ul>' +
+
+      '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">Username Tab (GhostTrack-inspired):</p>' +
+      '<p>Enumerate a username across 26 social, developer, content, security, gaming, and design platforms. Uses stealth HTTP requests to check profile existence.</p>' +
+      '<ul style="padding-left:20px;list-style:disc;">' +
+        '<li><strong>Developer</strong> &mdash; GitHub, GitLab, Bitbucket, Dev.to, npm, PyPI, Docker Hub, Replit, Codepen, HackerNews.</li>' +
+        '<li><strong>Security</strong> &mdash; HackerOne, Keybase.</li>' +
+        '<li><strong>Social / Content</strong> &mdash; Reddit, Medium, Twitch, YouTube, Pinterest, SoundCloud, Flickr, Patreon, Gravatar, About.me, Linktree.</li>' +
+        '<li><strong>Design / Gaming</strong> &mdash; Dribbble, Behance, Steam.</li>' +
+      '</ul>' +
+      '<p>Results show a table with found/not found status per platform, profile links for found accounts, and AI digital footprint analysis that assesses user type, platform distribution, and OPSEC observations.</p>' +
+
       '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">History Tab:</p>' +
-      '<p>Last 100 lookups (domain + IP) with type, target, summary, and timestamp. Click any entry to re-run the investigation.</p>' +
+      '<p>Last 100 lookups (domain, IP, phone, username) with type, target, summary, and timestamp.</p>' +
 
       '<p style="color:var(--text-primary);font-weight:600;margin:12px 0 4px;">Web Recon Tab (Scrapy + Scrapling inspired):</p>' +
       '<p>Lightweight web crawler for security reconnaissance with stealth capabilities. Four spider types:</p>' +
@@ -581,7 +600,7 @@ Views.docs = {
       '<p>Surface and fingerprint scans automatically extract Indicators of Compromise from crawled pages: IPv4 addresses (excluding private ranges), MD5 and SHA256 hashes, and CVE identifiers. Threat Intel spider extracts IOCs from all feed data. IOC counts are shown in the results stat cards and listed in a dedicated section.</p>' +
       '<p>Results include stat cards (pages, emails, technologies, exposed paths, header score, IOCs, duration), technology badges, security header analysis, exposed path table, form detection, IOC listing, and AI analysis button.</p>' +
 
-      '<p><strong>Q: Does OSINT make external API calls?</strong><br>A: Domain recon uses TLS connections (for SSL cert) and HTTP requests (for headers/technologies). IP lookup uses ip-api.com for geolocation. Web Recon crawls the target directly. Threat Intel fetches public feeds (CISA, abuse.ch, OpenPhish, IPsum). No paid APIs required.</p>' +
+      '<p><strong>Q: Does OSINT make external API calls?</strong><br>A: Domain recon uses TLS connections (for SSL cert) and HTTP requests (for headers/technologies). IP lookup uses ip-api.com for geolocation. Web Recon crawls the target directly. Threat Intel fetches public feeds (CISA, abuse.ch, OpenPhish, IPsum). Username enumeration makes HTTP requests to 26 platform profile URLs. Phone Intel is local parsing only (no external calls). No paid APIs required.</p>' +
       '<p><strong>Q: What does Web Recon crawl?</strong><br>A: Only the target domain (internal links). External links are counted but not followed. Rate-limited to 500ms between requests by default (with jitter in stealth mode). Respects robots.txt. Max 30 pages per scan.</p>' +
       '<p><strong>Q: What threat intel feeds are scraped?</strong><br>A: CISA Known Exploited Vulnerabilities (JSON), Feodo Tracker botnet C2 IPs, URLhaus malware URLs, ThreatFox malware MD5s, OpenPhish phishing URLs, and IPsum threat IP aggregator. All public, no API keys needed.</p>' +
 

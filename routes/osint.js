@@ -408,6 +408,88 @@ Assess: domain reputation, attack surface, potential risks, email security, host
   });
 
   // ══════════════════════════════════════════════════════════════════════
+  //  Ghost OSINT — Username enumeration + Phone intelligence
+  // ══════════════════════════════════════════════════════════════════════
+  const { enumerateUsername, parsePhoneNumber } = require('../lib/ghost-osint');
+
+  // POST /api/osint/username — enumerate username across platforms
+  app.post('/api/osint/username', requireRole('analyst'), async (req, res) => {
+    const { username } = req.body;
+    if (!username || typeof username !== 'string') {
+      return res.status(400).json({ error: 'username required' });
+    }
+
+    try {
+      const progressCb = ctx.io ? (p) => {
+        ctx.io.emit('username_progress', p);
+      } : null;
+
+      const result = await enumerateUsername(username.trim(), progressCb);
+
+      if (result.error) return res.status(400).json({ error: result.error });
+
+      // AI analysis
+      let analysis = null;
+      if (askAI && result.found > 0) {
+        try {
+          const foundPlatforms = result.results.filter(r => r.found).map(r => r.platform + ' (' + r.category + ')').join(', ');
+          const prompt = `You are an OSINT analyst. Assess this username's digital footprint (4-6 sentences).
+
+Username: ${username}
+Found on ${result.found}/${result.total} platforms: ${foundPlatforms}
+Not found: ${result.notFound}, Errors: ${result.errors}
+
+Assess: What type of user is this likely to be (developer, gamer, content creator, security researcher)? Is the username common or unique? What does the platform distribution tell us about this person? Any OPSEC observations?`;
+          analysis = await askAI(prompt, { timeout: 20000 });
+        } catch { /* AI optional */ }
+      }
+
+      result.analysis = analysis;
+      saveToHistory('username', username, `${result.found}/${result.total} platforms found`);
+      res.json(result);
+    } catch (e) {
+      console.error('[OSINT] Username error:', e.message);
+      res.status(500).json({ error: 'Username enumeration failed: ' + e.message });
+    }
+  });
+
+  // POST /api/osint/phone — phone number intelligence
+  app.post('/api/osint/phone', requireRole('analyst'), async (req, res) => {
+    const { phone } = req.body;
+    if (!phone || typeof phone !== 'string') {
+      return res.status(400).json({ error: 'phone number required' });
+    }
+
+    try {
+      const result = parsePhoneNumber(phone.trim());
+
+      // AI analysis
+      let analysis = null;
+      if (askAI && result.countryCode) {
+        try {
+          const prompt = `You are a telecommunications OSINT analyst. Analyze this phone number (3-5 sentences).
+
+Number: ${result.e164 || result.input}
+Country: ${result.country || 'unknown'} (${result.iso || '?'})
+Line Type: ${result.lineType || 'unknown'}
+Valid format: ${result.valid ? 'yes' : 'no'}
+National number length: ${result.numberLength || '?'} (expected: ${(result.expectedLengths || []).join(' or ')})
+
+Provide: What region/carrier this likely belongs to, any notable characteristics about this number range, OSINT significance (is this a mobile, landline, VoIP, toll-free?), and any red flags.`;
+          analysis = await askAI(prompt, { timeout: 15000 });
+        } catch { /* AI optional */ }
+      }
+
+      result.analysis = analysis;
+      saveToHistory('phone', phone.trim(), `${result.country || 'unknown'} — ${result.lineType || 'unknown'}`);
+      res.json(result);
+    } catch (e) {
+      console.error('[OSINT] Phone error:', e.message);
+      res.status(500).json({ error: 'Phone lookup failed: ' + e.message });
+    }
+  });
+
+  // ══════════════════════════════════════════════════════════════════════
   //  Web Recon — Scrapy-inspired crawling/reconnaissance
   // ══════════════════════════════════════════════════════════════════════
   const { WebRecon } = require('../lib/web-recon');
