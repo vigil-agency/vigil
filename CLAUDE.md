@@ -477,6 +477,15 @@ Users bring their own AI subscriptions. The app shells out to locally-installed 
 - Requires `gh` CLI installed and authenticated; graceful degradation when absent
 - API: `GET /api/proxy-nodes`, `POST /api/proxy-nodes`, `POST /api/proxy-nodes/ai-plan`
 
+### Web Recon (Scrapy-inspired)
+- Lightweight Node.js web crawler in `lib/web-recon.js` (Scrapy Spider→Pipeline architecture)
+- 3 spider types: surface (crawl+extract), exposed (50+ sensitive path check), fingerprint (deep tech detection)
+- Extracts: links (internal/external), emails, forms (login/upload), technologies (20+ patterns), security headers (9 checks)
+- Rate-limited (configurable delay), robots.txt-aware, depth-limited (max 3), URL deduplication
+- Integrated as "Web Recon" tab in existing OSINT view (no new sidebar item)
+- AI analysis endpoint generates pentest-grade security assessments
+- API: `POST /api/osint/recon`, `GET /api/osint/recon/:id`, `GET /api/osint/recon`, `POST /api/osint/recon/:id/analyze`
+
 ## Auth
 - PBKDF2 password hashing (lib/users.js)
 - Session tokens in cookies (`vigil_session`) or Bearer header

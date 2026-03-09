@@ -579,6 +579,20 @@ Views.docs = {
       '<p><strong>Q: Does OSINT make external API calls?</strong><br>A: Domain recon uses TLS connections (for SSL cert) and HTTP requests (for headers/technologies). IP lookup uses ip-api.com for geolocation. Web Recon crawls the target directly. No paid APIs required.</p>' +
       '<p><strong>Q: What does Web Recon crawl?</strong><br>A: Only the target domain (internal links). External links are counted but not followed. Rate-limited to 500ms between requests by default. Respects robots.txt. Max 30 pages per scan.</p>' +
 
+      '<p style="color:var(--text-primary);font-weight:600;margin:16px 0 4px;">How to use Web Recon:</p>' +
+      '<ol style="padding-left:20px;line-height:2;">' +
+        '<li>Go to <strong>OSINT</strong> in the sidebar, click the <strong>Web Recon</strong> tab.</li>' +
+        '<li>Enter a target URL (e.g. <code style="background:var(--well);padding:1px 4px;border-radius:3px;">https://example.com</code>).</li>' +
+        '<li>Select a <strong>Spider Type</strong>:<br>' +
+          '&bull; <em>Surface Scan</em> &mdash; crawl pages, find emails, tech stack, forms, security headers.<br>' +
+          '&bull; <em>Exposed Files</em> &mdash; check 50+ sensitive paths (.env, .git, backups, configs).<br>' +
+          '&bull; <em>Tech Fingerprint</em> &mdash; identify server, CMS, JS frameworks, CDN from headers and HTML.</li>' +
+        '<li>Set <strong>Depth</strong> (1-3). Higher depth follows more internal links but takes longer.</li>' +
+        '<li>Click <strong>Crawl</strong>. Progress updates appear in real-time.</li>' +
+        '<li>When complete, results show: stat cards, technology badges, security header audit, exposed paths with risk levels, forms detected (login/upload flagged), and a history of past scans.</li>' +
+        '<li>Click <strong>AI Analysis</strong> on any result for a pentest-grade security assessment with risk rating, key findings, attack surface analysis, and prioritized recommendations.</li>' +
+      '</ol>' +
+
       /* Log Analysis */
       '<h3 style="color:var(--cyan);margin:28px 0 8px;font-size:var(--font-size-lg);">Log Analysis</h3>' +
       '<p>Natural language log querying. Type a question in plain English and AI searches Vigil\'s security data stores to generate analysis.</p>' +
