@@ -10,13 +10,17 @@ services:
       - VIGIL_PASS=${VIGIL_PASS:-}
       - DATABASE_URL=postgresql://vigil:vigil@postgres:5432/vigil
       - NODE_ENV=production
-      - AI_PROVIDER=${AI_PROVIDER:-claude-cli}
+      - AI_PROVIDER=${AI_PROVIDER:-ollama}
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen3:8b}
       - DOCKER_HOST=unix:///var/run/docker.sock
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
+      ollama:
+        condition: service_started
     volumes:
       - vigil-data:/app/data
       - /var/run/docker.sock:/var/run/docker.sock
@@ -32,6 +36,22 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  ollama:
+    image: ollama/ollama
+    container_name: vigil-ollama
+    volumes:
+      - ollama-models:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+    networks:
+      - vigil-net
 
   postgres:
     image: postgres:17-alpine
@@ -59,3 +79,4 @@ volumes:
   vigil-data:
   pg-data:
   gh-config:
+  ollama-models:

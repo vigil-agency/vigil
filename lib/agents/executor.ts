@@ -1,4 +1,6 @@
 import { chat, isOllamaAvailable, listModels } from "@/lib/ai/ollama-client";
+import { readProviderSelection } from "@/lib/ai/provider-selection";
+import { resolveTaskProvider } from "@/lib/ai/provider-router";
 import { evaluateRunPolicy, redactSecrets } from "@/lib/agents/guardrails";
 import { gatherTargetIntel } from "@/lib/agents/target-intel";
 import {
@@ -61,11 +63,61 @@ Evidence to capture:
 - Commands used, outputs, and change approvals`;
 }
 
+/**
+ * Run model using the resolved provider.
+ * Supports: ollama, claude-api, claude-cli, claude-code, codex
+ * Falls back to ollama if provider is not explicitly set.
+ */
 async function runModel(
   systemPrompt: string,
   taskPrompt: string,
-  inputText: string
+  inputText: string,
+  providerId?: string,
+  model?: string
 ): Promise<string> {
+  const prompt = taskPrompt.replace("{{input}}", inputText);
+  const effectiveProvider = providerId || "ollama";
+
+  // For non-ollama providers, delegate to lib/ai.js functions
+  if (effectiveProvider !== "ollama") {
+    try {
+      // Dynamic require to avoid circular dependency issues
+      const ai = require("@/lib/ai");
+      if (effectiveProvider === "claude-api" && ai.callClaudeAPI) {
+        return await ai.callClaudeAPI(prompt, {
+          systemPrompt,
+          model: model || undefined,
+          timeout: 20000,
+        });
+      }
+      if (effectiveProvider === "claude-cli" && ai.callClaudeCLI) {
+        return await ai.callClaudeCLI(prompt, {
+          systemPrompt,
+          timeout: 20000,
+        });
+      }
+      if (effectiveProvider === "claude-code" && ai.callClaudeCode) {
+        return await ai.callClaudeCode(prompt, {
+          systemPrompt,
+          timeout: 20000,
+        });
+      }
+      if (effectiveProvider === "codex" && ai.callCodex) {
+        return await ai.callCodex(prompt, {
+          systemPrompt,
+          timeout: 20000,
+        });
+      }
+      // askAI is the generic wrapper
+      if (ai.askAI) {
+        return await ai.askAI(prompt, { systemPrompt, timeout: 20000 });
+      }
+    } catch {
+      // Fall through to ollama
+    }
+  }
+
+  // Default: use ollama
   const available = await isOllamaAvailable();
   if (!available) {
     throw new Error("Ollama runtime unavailable");
@@ -76,14 +128,13 @@ async function runModel(
     throw new Error("No Ollama models available");
   }
 
-  const prompt = taskPrompt.replace("{{input}}", inputText);
   return Promise.race([
     chat(
       [
         { role: "system", content: systemPrompt },
         { role: "user", content: prompt },
       ],
-      { temperature: 0.2 }
+      { temperature: 0.2, model: model || undefined }
     ),
     new Promise<string>((_, reject) =>
       setTimeout(() => reject(new Error("Model response timeout")), 20000)
@@ -231,17 +282,37 @@ ${targetIntelContext}
     let output = "";
     let usedFallback = false;
 
+    // Resolve LLM provider from agent config (inherit → provider → pinned)
+    const resolved = resolveTaskProvider({
+      config: agent.config?.ai,
+      category: agent.category,
+      surface: "agent",
+    });
+
+    const resolvedProviderId = resolved?.providerId || "ollama";
+    const resolvedModel = resolved?.model || "";
+
     await appendRunStep(
       job.runId,
       ++step,
       "reasoning",
       "running",
       "Generating agent response with model runtime.",
-      { model_profile: agent.model_profile }
+      {
+        model_profile: agent.model_profile,
+        provider: resolvedProviderId,
+        model: resolvedModel || "(default)",
+      }
     );
 
     try {
-      output = await runModel(systemPrompt, agent.task_prompt, sanitizedInput);
+      output = await runModel(
+        systemPrompt,
+        agent.task_prompt,
+        sanitizedInput,
+        resolvedProviderId,
+        resolvedModel
+      );
     } catch (err) {
       usedFallback = true;
       output = fallbackResponse(agent.name, sanitizedInput);

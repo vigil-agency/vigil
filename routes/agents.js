@@ -352,7 +352,7 @@ module.exports = function (app, ctx) {
 
   // POST /api/agents — create custom agent
   app.post('/api/agents', requireRole('analyst'), (req, res) => {
-    const { name, category, description, system_prompt, task_prompt } = req.body;
+    const { name, category, description, system_prompt, task_prompt, config } = req.body;
     if (!name) return res.status(400).json({ error: 'name required' });
 
     // Auto-generate prompts if not provided
@@ -370,6 +370,7 @@ module.exports = function (app, ctx) {
       task_prompt: taskPrompt,
       risk_level: 'medium',
       tools_allowed: [],
+      config: config || {},
       builtIn: false,
       enabled: true,
       createdAt: new Date().toISOString(),
@@ -396,7 +397,8 @@ module.exports = function (app, ctx) {
     const agent = agents.find(a => a.id === req.params.id);
     if (!agent) return res.status(404).json({ error: 'Agent not found' });
 
-    const { name, category, description, system_prompt, task_prompt, risk_level, enabled, tools_allowed } = req.body;
+    const { name, category, description, system_prompt, task_prompt, risk_level, enabled, tools_allowed,
+            config, model_profile, memory_policy, autonomy_mode, budget_limit } = req.body;
     if (name !== undefined) agent.name = escapeHtml(name);
     if (category !== undefined) agent.category = category;
     if (description !== undefined) agent.description = escapeHtml(description);
@@ -405,6 +407,11 @@ module.exports = function (app, ctx) {
     if (risk_level !== undefined) agent.risk_level = risk_level;
     if (enabled !== undefined) agent.enabled = enabled;
     if (tools_allowed !== undefined) agent.tools_allowed = tools_allowed;
+    if (config !== undefined) agent.config = config;
+    if (model_profile !== undefined) agent.model_profile = model_profile;
+    if (memory_policy !== undefined) agent.memory_policy = memory_policy;
+    if (autonomy_mode !== undefined) agent.autonomy_mode = autonomy_mode;
+    if (budget_limit !== undefined) agent.budget_limit = budget_limit;
     agent.updatedAt = new Date().toISOString();
 
     writeJSON(AGENTS_PATH, agents);

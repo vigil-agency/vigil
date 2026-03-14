@@ -1,3 +1,12 @@
+import type { ProviderSelectionState } from "@/lib/ai/provider-selection";
+
+export type { ProviderSelectionState };
+
+export interface AgentConfig {
+  ai?: ProviderSelectionState;
+  [key: string]: unknown;
+}
+
 export const AGENT_CATEGORIES = [
   "recon",
   "appsec",
@@ -41,6 +50,7 @@ export interface AgentRecord {
   budget_limit: number;
   autonomy_mode: AgentAutonomyMode;
   settings: Record<string, unknown>;
+  config: AgentConfig;
   version: number;
   created_at: string;
   updated_at: string;
@@ -97,4 +107,5 @@ export interface AgentTemplate {
   budget_limit: number;
   autonomy_mode: AgentAutonomyMode;
   settings: Record<string, unknown>;
+  config?: AgentConfig;
 }

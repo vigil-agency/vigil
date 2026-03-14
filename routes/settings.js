@@ -27,7 +27,7 @@ module.exports = function (app, ctx) {
   // GET /api/settings
   app.get('/api/settings', requireAdmin, (req, res) => {
     const settings = readJSON(SETTINGS_PATH, {
-      aiProvider: 'claude-cli',
+      aiProvider: 'ollama',
       theme: 'dark',
       autoScan: false,
       scanInterval: 24,
@@ -44,7 +44,8 @@ module.exports = function (app, ctx) {
 
     // Whitelist of allowed settings
     const allowed = [
-      'aiProvider', 'theme', 'autoScan', 'scanInterval',
+      'aiProvider', 'ollamaBaseUrl', 'ollamaModel',
+      'theme', 'autoScan', 'scanInterval',
       'notificationsEnabled', 'postureRefreshInterval',
       'companyName', 'contactEmail', 'slackWebhook', 'discordWebhook',
       'smtp', 'maxConcurrentScans', 'retentionDays',
@@ -68,15 +69,17 @@ module.exports = function (app, ctx) {
     const settings = readJSON(SETTINGS_PATH, {});
     res.json({
       provider: settings.aiProvider || 'none',
-      available: ['claude-api', 'claude-cli', 'codex', 'none'],
+      available: ['ollama', 'claude-api', 'claude-cli', 'codex', 'none'],
+      ollamaBaseUrl: settings.ollamaBaseUrl || '',
+      ollamaModel: settings.ollamaModel || '',
     });
   });
 
   // POST /api/settings/ai — update AI provider
   app.post('/api/settings/ai', requireAdmin, (req, res) => {
     const { provider } = req.body;
-    if (!provider || !['claude-api', 'claude-cli', 'codex', 'none'].includes(provider)) {
-      return res.status(400).json({ error: 'Invalid provider. Use: claude-api, claude-cli, codex, none' });
+    if (!provider || !['ollama', 'claude-api', 'claude-cli', 'codex', 'none'].includes(provider)) {
+      return res.status(400).json({ error: 'Invalid provider. Use: ollama, claude-api, claude-cli, codex, none' });
     }
 
     const settings = readJSON(SETTINGS_PATH, {});

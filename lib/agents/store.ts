@@ -35,6 +35,7 @@ export interface AgentPatchInput {
   budget_limit?: number;
   autonomy_mode?: AgentRecord["autonomy_mode"];
   settings?: Record<string, unknown>;
+  config?: Record<string, unknown>;
 }
 
 export interface AgentCampaignRecord {
@@ -85,6 +86,7 @@ export interface AgentCreateInput {
   budget_limit: number;
   autonomy_mode: AgentRecord["autonomy_mode"];
   settings: Record<string, unknown>;
+  config?: Record<string, unknown>;
 }
 
 export async function ensureAgentTables(): Promise<void> {
@@ -262,6 +264,8 @@ export async function ensureAgentTables(): Promise<void> {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS config JSONB NOT NULL DEFAULT '{}'::jsonb;
+
     CREATE INDEX IF NOT EXISTS idx_agents_user_category ON agents(user_id, category);
     CREATE INDEX IF NOT EXISTS idx_agent_runs_user_created ON agent_runs(user_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_agent_runs_agent_created ON agent_runs(agent_id, created_at DESC);
@@ -393,9 +397,9 @@ export async function createAgent(
   const created = await queryOne<AgentRecord>(
     `INSERT INTO agents (
        user_id, slug, name, description, category, active, system_prompt, task_prompt,
-       tools_allowed, risk_level, model_profile, memory_policy, budget_limit, autonomy_mode, settings
+       tools_allowed, risk_level, model_profile, memory_policy, budget_limit, autonomy_mode, settings, config
      ) VALUES (
-       $1, $2, $3, $4, $5, TRUE, $6, $7, $8::text[], $9, $10, $11, $12, $13, $14::jsonb
+       $1, $2, $3, $4, $5, TRUE, $6, $7, $8::text[], $9, $10, $11, $12, $13, $14::jsonb, $15::jsonb
      )
      RETURNING *`,
     [
@@ -413,6 +417,7 @@ export async function createAgent(
       input.budget_limit,
       input.autonomy_mode,
       JSON.stringify(input.settings),
+      JSON.stringify(input.config || {}),
     ]
   );
 
@@ -499,6 +504,10 @@ export async function updateAgent(
     sets.push(`settings = $${idx++}::jsonb`);
     params.push(JSON.stringify(patch.settings));
     shouldVersion = true;
+  }
+  if (patch.config !== undefined) {
+    sets.push(`config = $${idx++}::jsonb`);
+    params.push(JSON.stringify(patch.config));
   }
 
   if (sets.length === 0) {

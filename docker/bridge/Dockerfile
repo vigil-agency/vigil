@@ -25,6 +25,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     jq \
     ca-certificates \
+    supervisor \
+    mcp-kali-server \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Install Go-based tools (nuclei, subfinder, httpx) ──────────────
@@ -63,6 +65,7 @@ RUN npm install --production
 
 COPY bridge.js ./
 COPY parsers/ ./parsers/
+COPY supervisord.conf /etc/supervisor/conf.d/bridge.conf
 
 # ── Runtime ────────────────────────────────────────────────────────
 ENV PORT=9877
@@ -71,4 +74,4 @@ EXPOSE 9877
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
     CMD curl -f http://localhost:9877/health || exit 1
 
-CMD ["node", "bridge.js"]
+CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/conf.d/bridge.conf"]

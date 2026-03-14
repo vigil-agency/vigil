@@ -128,6 +128,11 @@
               <span class="nav-item-label">Security Agents</span>
               <span class="nav-item-fav" data-fav="agents">&#9734;</span>
             </div>
+            <div class="nav-item" data-view="flows" data-tooltip="Flows">
+              <span class="nav-item-icon">&#128260;</span>
+              <span class="nav-item-label">Flows</span>
+              <span class="nav-item-fav" data-fav="flows">&#9734;</span>
+            </div>
             <div class="nav-item" data-view="campaigns" data-tooltip="Campaigns">
               <span class="nav-item-icon">&#127919;</span>
               <span class="nav-item-label">Campaigns</span>
@@ -399,6 +404,7 @@
       <div id="view-findings" class="view-container"></div>
       <div id="view-timeline" class="view-container"></div>
       <div id="view-agents" class="view-container"></div>
+      <div id="view-flows" class="view-container"></div>
       <div id="view-campaigns" class="view-container"></div>
       <div id="view-pentest" class="view-container"></div>
       <div id="view-playbooks" class="view-container"></div>
@@ -445,46 +451,47 @@
   <div class="toast-container" id="toast-container"></div>
 
   <!-- ══════════════════════ SCRIPTS ══════════════════════ -->
-  <script src="js/app.js?v=1.1.0"></script>
-  <script src="js/modal.js?v=1.1.0"></script>
-  <script src="js/toast.js?v=1.1.0"></script>
-  <script src="js/charts.js?v=1.1.0"></script>
+  <script src="js/app.js?v=1.2.0"></script>
+  <script src="js/modal.js?v=1.2.0"></script>
+  <script src="js/toast.js?v=1.2.0"></script>
+  <script src="js/charts.js?v=1.2.0"></script>
 
   <!-- Views -->
-  <script src="js/views/dashboard.js?v=1.1.0"></script>
-  <script src="js/views/threats.js?v=1.1.0"></script>
-  <script src="js/views/triage.js?v=1.1.0"></script>
-  <script src="js/views/hunt.js?v=1.1.0"></script>
-  <script src="js/views/port-scanner.js?v=1.1.0"></script>
-  <script src="js/views/vuln-scanner.js?v=1.1.0"></script>
-  <script src="js/views/web-scanner.js?v=1.1.0"></script>
-  <script src="js/views/container-security.js?v=1.1.0"></script>
-  <script src="js/views/ssl-monitor.js?v=1.1.0"></script>
-  <script src="js/views/dns-security.js?v=1.1.0"></script>
-  <script src="js/views/code-audit.js?v=1.1.0"></script>
-  <script src="js/views/proxy-nodes.js?v=1.1.0"></script>
-  <script src="js/views/osint.js?v=1.1.0"></script>
-  <script src="js/views/findings.js?v=1.1.0"></script>
-  <script src="js/views/timeline.js?v=1.1.0"></script>
-  <script src="js/views/agents.js?v=1.1.0"></script>
-  <script src="js/views/campaigns.js?v=1.1.0"></script>
-  <script src="js/views/pentest.js?v=1.1.0"></script>
-  <script src="js/views/playbooks.js?v=1.1.0"></script>
-  <script src="js/views/compliance.js?v=1.1.0"></script>
-  <script src="js/views/reports.js?v=1.1.0"></script>
-  <script src="js/views/audit-log.js?v=1.1.0"></script>
-  <script src="js/views/terminal.js?v=1.1.0"></script>
-  <script src="js/views/knowledge.js?v=1.1.0"></script>
-  <script src="js/views/mcp-playground.js?v=1.1.0"></script>
-  <script src="js/views/calendar.js?v=1.1.0"></script>
-  <script src="js/views/notes.js?v=1.1.0"></script>
-  <script src="js/views/git.js?v=1.1.0"></script>
-  <script src="js/views/github-hub.js?v=1.1.0"></script>
-  <script src="js/views/network.js?v=1.1.0"></script>
-  <script src="js/views/log-analysis.js?v=1.1.0"></script>
-  <script src="js/views/credentials.js?v=1.1.0"></script>
-  <script src="js/views/notifications.js?v=1.1.0"></script>
-  <script src="js/views/settings.js?v=1.1.0"></script>
+  <script src="js/views/dashboard.js?v=1.2.0"></script>
+  <script src="js/views/threats.js?v=1.2.0"></script>
+  <script src="js/views/triage.js?v=1.2.0"></script>
+  <script src="js/views/hunt.js?v=1.2.0"></script>
+  <script src="js/views/port-scanner.js?v=1.2.0"></script>
+  <script src="js/views/vuln-scanner.js?v=1.2.0"></script>
+  <script src="js/views/web-scanner.js?v=1.2.0"></script>
+  <script src="js/views/container-security.js?v=1.2.0"></script>
+  <script src="js/views/ssl-monitor.js?v=1.2.0"></script>
+  <script src="js/views/dns-security.js?v=1.2.0"></script>
+  <script src="js/views/code-audit.js?v=1.2.0"></script>
+  <script src="js/views/proxy-nodes.js?v=1.2.0"></script>
+  <script src="js/views/osint.js?v=1.2.0"></script>
+  <script src="js/views/findings.js?v=1.2.0"></script>
+  <script src="js/views/timeline.js?v=1.2.0"></script>
+  <script src="js/views/agents.js?v=1.2.0"></script>
+  <script src="js/views/flows.js?v=1.2.0"></script>
+  <script src="js/views/campaigns.js?v=1.2.0"></script>
+  <script src="js/views/pentest.js?v=1.2.0"></script>
+  <script src="js/views/playbooks.js?v=1.2.0"></script>
+  <script src="js/views/compliance.js?v=1.2.0"></script>
+  <script src="js/views/reports.js?v=1.2.0"></script>
+  <script src="js/views/audit-log.js?v=1.2.0"></script>
+  <script src="js/views/terminal.js?v=1.2.0"></script>
+  <script src="js/views/knowledge.js?v=1.2.0"></script>
+  <script src="js/views/mcp-playground.js?v=1.2.0"></script>
+  <script src="js/views/calendar.js?v=1.2.0"></script>
+  <script src="js/views/notes.js?v=1.2.0"></script>
+  <script src="js/views/git.js?v=1.2.0"></script>
+  <script src="js/views/github-hub.js?v=1.2.0"></script>
+  <script src="js/views/network.js?v=1.2.0"></script>
+  <script src="js/views/log-analysis.js?v=1.2.0"></script>
+  <script src="js/views/credentials.js?v=1.2.0"></script>
+  <script src="js/views/notifications.js?v=1.2.0"></script>
+  <script src="js/views/settings.js?v=1.2.0"></script>
   <script src="js/views/docs.js?v=1.2.0"></script>
 </body>
 </html>

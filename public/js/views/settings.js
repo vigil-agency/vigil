@@ -35,7 +35,11 @@ Views.settings = {
       '<div class="tab-content" id="settings-ai">' +
         '<div class="glass-card" style="max-width:500px;">' +
           '<div class="glass-card-title" style="margin-bottom:16px;">AI Provider</div>' +
-          '<div class="form-group"><label class="form-label">Provider</label><select class="form-select" id="settings-ai-provider"><option value="claude-api">Claude API (recommended)</option><option value="claude-cli">Claude CLI</option><option value="codex">Codex CLI</option><option value="none">None (AI features disabled)</option></select></div>' +
+          '<div class="form-group"><label class="form-label">Provider</label><select class="form-select" id="settings-ai-provider"><option value="ollama">Ollama (Local — recommended)</option><option value="claude-api">Claude API</option><option value="claude-cli">Claude CLI</option><option value="codex">Codex CLI</option><option value="none">None (AI features disabled)</option></select></div>' +
+          '<div id="settings-ollama-config" style="display:none;">' +
+            '<div class="form-group"><label class="form-label">Ollama Base URL</label><input type="text" class="form-input" id="settings-ollama-url" placeholder="http://ollama:11434"></div>' +
+            '<div class="form-group"><label class="form-label">Model</label><input type="text" class="form-input" id="settings-ollama-model" placeholder="qwen3:8b"></div>' +
+          '</div>' +
           '<div id="settings-ai-status" style="margin-top:12px;"></div>' +
           '<div style="display:flex;gap:8px;margin-top:12px;">' +
             '<button class="btn btn-primary" id="settings-save-ai">Save</button>' +
@@ -148,17 +152,32 @@ Views.settings = {
         .catch(function() { Toast.error('2FA setup failed'); });
     });
 
+    // Toggle Ollama config fields based on provider selection
+    document.getElementById('settings-ai-provider').addEventListener('change', function() {
+      var ollamaCfg = document.getElementById('settings-ollama-config');
+      ollamaCfg.style.display = this.value === 'ollama' ? '' : 'none';
+    });
+
     // AI save
     document.getElementById('settings-save-ai').addEventListener('click', function() {
       var provider = document.getElementById('settings-ai-provider').value;
-      fetch('/api/settings/ai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ provider: provider })
-      })
-      .then(function() { Toast.success('AI provider saved'); })
-      .catch(function() { Toast.error('Save failed'); });
+      var saves = [
+        fetch('/api/settings/ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ provider: provider })
+        })
+      ];
+      if (provider === 'ollama') {
+        var url = document.getElementById('settings-ollama-url').value.trim();
+        var model = document.getElementById('settings-ollama-model').value.trim();
+        if (url) saves.push(fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ key: 'ollamaBaseUrl', value: url }) }));
+        if (model) saves.push(fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ key: 'ollamaModel', value: model }) }));
+      }
+      Promise.all(saves)
+        .then(function() { Toast.success('AI provider saved'); })
+        .catch(function() { Toast.error('Save failed'); });
     });
 
     // AI test
@@ -203,6 +222,8 @@ Views.settings = {
     }
     // Always load 2FA status on show
     this.load2FAStatus();
+    // Load AI settings
+    this.loadAISettings();
   },
 
   hide: function() {},
@@ -210,6 +231,26 @@ Views.settings = {
   loadTabData: function() {
     if (this._activeTab === 'scanners') this.loadScanners();
     if (this._activeTab === 'about') this.loadAbout();
+  },
+
+  loadAISettings: function() {
+    fetch('/api/settings/ai', { credentials: 'same-origin' })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var sel = document.getElementById('settings-ai-provider');
+        if (sel && data.provider) sel.value = data.provider;
+        var ollamaCfg = document.getElementById('settings-ollama-config');
+        if (ollamaCfg) ollamaCfg.style.display = data.provider === 'ollama' ? '' : 'none';
+        if (data.ollamaBaseUrl) {
+          var urlEl = document.getElementById('settings-ollama-url');
+          if (urlEl) urlEl.value = data.ollamaBaseUrl;
+        }
+        if (data.ollamaModel) {
+          var modelEl = document.getElementById('settings-ollama-model');
+          if (modelEl) modelEl.value = data.ollamaModel;
+        }
+      })
+      .catch(function() {});
   },
 
   load2FAStatus: function() {

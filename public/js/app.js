@@ -179,6 +179,7 @@
     'findings': 'Findings',
     'timeline': 'Attack Timeline',
     'agents': 'Security Agents',
+    'flows': 'Security Flows',
     'campaigns': 'Campaigns',
     'pentest': 'Pentest',
     'playbooks': 'Playbooks',
